@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #16274a;
+  --foreground: #edf0f6;
 }
 
 @theme inline {
@@ -14,13 +14,37 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #16274a;
+    --foreground: #edf0f6;
   }
 }
 
+html {
+  background: linear-gradient(
+    180deg,
+    #1b2f57 0%,
+    #16274a 40%,
+    #121f3b 100%
+  );
+  color: var(--foreground);
+}
+
 body {
-  background: var(--background);
+  background: linear-gradient(
+    180deg,
+    #1b2f57 0%,
+    #16274a 40%,
+    #121f3b 100%
+  );
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Respect iOS safe areas when installed to home screen */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 }
