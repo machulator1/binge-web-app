@@ -49,6 +49,7 @@ type SavedQueueItem = {
 };
 
 const SAVED_ITEMS_STORAGE_KEY = "binge_saved_items_v1";
+const LAST_AUTH_EMAIL_STORAGE_KEY = "binge_last_auth_email_v1";
 
 type HomeRecommendation = {
   id: string;
@@ -292,6 +293,19 @@ export default function Home() {
 
   useEffect(() => {
     if (!authOpen) return;
+    if (authEmail.trim()) return;
+
+    try {
+      const raw = window.localStorage.getItem(LAST_AUTH_EMAIL_STORAGE_KEY);
+      const saved = (raw ?? "").trim();
+      if (saved) setAuthEmail(saved);
+    } catch {
+      // Ignore
+    }
+  }, [authOpen, authEmail]);
+
+  useEffect(() => {
+    if (!authOpen) return;
     const t = window.setInterval(() => setAuthNowMs(Date.now()), 250);
     return () => window.clearInterval(t);
   }, [authOpen]);
@@ -337,6 +351,12 @@ export default function Home() {
       }
 
       setAuthCooldownUntilMs(Date.now() + 60_000);
+
+      try {
+        window.localStorage.setItem(LAST_AUTH_EMAIL_STORAGE_KEY, email);
+      } catch {
+        // Ignore
+      }
 
       setAuthStatus("sent");
     } catch (err) {
@@ -911,7 +931,7 @@ export default function Home() {
                       }}
                       className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
                     >
-                      Sign out
+                      Switch account
                     </button>
                   ) : (
                     <button
@@ -1141,7 +1161,7 @@ export default function Home() {
               <div className="px-5 pb-5 pt-5">
                 <div className="text-sm font-semibold tracking-tight text-foreground">Sign in</div>
                 <div className="mt-1 text-xs font-medium text-foreground/55">
-                  We’ll email you a magic link.
+                  We’ll send you a sign-in link.
                 </div>
 
                 <label className="mt-4 block">
@@ -1180,7 +1200,11 @@ export default function Home() {
                     disabled={authStatus === "sending" || authNowMs < authCooldownUntilMs}
                     className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-500/90 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 active:scale-[0.99] disabled:opacity-60"
                   >
-                    {authStatus === "sending" ? "Sending…" : "Email me a link"}
+                    {authStatus === "sending"
+                      ? "Sending…"
+                      : authEmail.trim()
+                        ? `Send sign-in link to ${authEmail.trim()}`
+                        : "Send sign-in link"}
                   </button>
                   <button
                     type="button"
