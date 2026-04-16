@@ -24,6 +24,7 @@ type QueueItem = {
   thumbnailUrl?: string;
   description?: string;
   notes?: string;
+  storage?: "local" | "server";
 };
 
 type ShareRow = {
@@ -358,7 +359,7 @@ export default function LibraryPage() {
         const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY);
         const parsed = raw ? (JSON.parse(raw) as unknown) : [];
         const stored = Array.isArray(parsed) ? (parsed as QueueItem[]) : [];
-        setItems(stored);
+        setItems(stored.map((it) => ({ ...it, storage: it.storage ?? "local" })));
       } catch {
         // Ignore
       }
@@ -373,6 +374,86 @@ export default function LibraryPage() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadServerItems() {
+      if (!sessionToken) return;
+
+      try {
+        const res = await fetch("/api/saved-items", {
+          headers: {
+            authorization: `Bearer ${sessionToken}`,
+          },
+        });
+
+        if (!res.ok) return;
+
+        const data = (await res.json()) as { items?: QueueItem[] };
+        const loaded = Array.isArray(data.items) ? (data.items as QueueItem[]) : [];
+        const next = loaded.map((it) => ({ ...it, storage: "server" as const }));
+        if (cancelled) return;
+        setItems(next);
+
+        try {
+          const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY);
+          const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+          const stored = Array.isArray(parsed) ? (parsed as QueueItem[]) : [];
+          const local = stored.filter((it) => (it.storage ?? "local") !== "server");
+          if (local.length === 0) return;
+
+          await Promise.all(
+            local.slice(0, 100).map((it) =>
+              fetch("/api/saved-items", {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${sessionToken}`,
+                },
+                body: JSON.stringify({
+                  url: it.url,
+                  title: it.title,
+                  modality: it.modality,
+                  thumbnailUrl: it.thumbnailUrl,
+                  durationMinutes: it.durationMinutes,
+                  source: it.source,
+                  savedBy: it.savedBy,
+                  status: it.status,
+                  dateSaved: it.dateSaved,
+                  description: it.description,
+                  notes: it.notes,
+                }),
+              }),
+            ),
+          );
+
+          const refreshed = await fetch("/api/saved-items", {
+            headers: {
+              authorization: `Bearer ${sessionToken}`,
+            },
+          });
+          if (!refreshed.ok) return;
+          const refreshedData = (await refreshed.json()) as { items?: QueueItem[] };
+          const refreshedItems = Array.isArray(refreshedData.items)
+            ? (refreshedData.items as QueueItem[])
+            : [];
+          if (cancelled) return;
+          setItems(refreshedItems.map((it) => ({ ...it, storage: "server" as const })));
+          window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify([]));
+        } catch {
+          // Ignore migration failures
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    void loadServerItems();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionToken]);
 
   useEffect(() => {
     if (!supabase) {
@@ -542,10 +623,27 @@ export default function LibraryPage() {
   function deleteItem(item: QueueItem) {
     if (!confirm("Delete this item from your library?")) return;
 
+    if (sessionToken && item.storage === "server") {
+      const next = items.filter((it) => it.id !== item.id);
+      setItems(next);
+
+      void fetch(`/api/saved-items?id=${encodeURIComponent(item.id)}`, {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${sessionToken}`,
+        },
+      });
+
+      return;
+    }
+
     try {
       const next = items.filter((it) => it.id !== item.id);
       setItems(next);
-      window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(
+        SAVED_ITEMS_STORAGE_KEY,
+        JSON.stringify(next.map((it) => ({ ...it, storage: it.storage ?? "local" }))),
+      );
     } catch {
       // Ignore
     }

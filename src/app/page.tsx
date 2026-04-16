@@ -550,7 +550,7 @@ export default function Home() {
     setResolveStatus("idle");
   }
 
-  function saveToLibrary() {
+  async function saveToLibrary() {
     if (!saveDraft) return;
 
     const item: SavedQueueItem = {
@@ -567,6 +567,35 @@ export default function Home() {
       description: saveDraft.description,
       notes: saveDraft.notes.trim() ? saveDraft.notes.trim() : undefined,
     };
+
+    try {
+      const sessionRes = await supabase?.auth.getSession();
+      const token = sessionRes?.data?.session?.access_token;
+      if (token) {
+        await fetch("/api/saved-items", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            url: item.url,
+            title: item.title,
+            modality: item.modality,
+            thumbnailUrl: item.thumbnailUrl,
+            durationMinutes: item.durationMinutes,
+            source: item.source,
+            savedBy: item.savedBy,
+            status: item.status,
+            dateSaved: item.dateSaved,
+            description: item.description,
+            notes: item.notes,
+          }),
+        });
+      }
+    } catch {
+      // Ignore server persistence failures
+    }
 
     try {
       const raw =
@@ -662,6 +691,17 @@ export default function Home() {
               <div className="w-10" />
             </div>
             <div className="mt-3 text-sm leading-6 text-foreground/60">Find the right thing for this moment.</div>
+            {!sessionEmail ? (
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => setAuthOpen(true)}
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-foreground/80 transition duration-200 hover:bg-white/10 active:bg-white/12"
+                >
+                  Sign in
+                </button>
+              </div>
+            ) : null}
           </header>
 
           <section className="mt-14">
@@ -714,10 +754,6 @@ export default function Home() {
                   </button>
                 </div>
               </label>
-
-              <div className="mt-4 text-center text-xs font-medium leading-5 text-foreground/40">
-                Use natural language to describe what you want.
-              </div>
               <div className="sr-only">{prompt}</div>
             </form>
           </section>
@@ -732,7 +768,7 @@ export default function Home() {
             <Link
               href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
               onClick={() => openTodaysRecommendationInApp({ navigate: false })}
-              className="group relative overflow-hidden rounded-[28px] border border-white/12 bg-slate-800/95 p-5 text-left shadow-[0_30px_110px_rgba(0,0,0,0.62)] transition duration-200 active:scale-[0.99] active:shadow-[0_24px_92px_rgba(0,0,0,0.72)]"
+              className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/12 bg-slate-800/95 p-4 text-left shadow-[0_26px_96px_rgba(0,0,0,0.58)] transition duration-200 active:scale-[0.99] active:shadow-[0_22px_84px_rgba(0,0,0,0.70)]"
             >
               <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
 
@@ -828,7 +864,7 @@ export default function Home() {
         </footer>
       </main>
 
-      <div className="fixed right-4 top-4 z-50">
+      <div className="fixed right-4 z-50" style={{ top: "calc(env(safe-area-inset-top) + 16px)" }}>
         <div className="relative">
           <button
             type="button"

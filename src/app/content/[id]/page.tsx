@@ -5,6 +5,7 @@ import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 type Modality = "article" | "video" | "podcast";
 
@@ -23,6 +24,7 @@ type SavedQueueItem = {
   dateSaved: string;
   description?: string;
   notes?: string;
+  storage?: "local" | "server";
 };
 
 const SAVED_ITEMS_STORAGE_KEY = "binge_saved_items_v1";
@@ -90,6 +92,7 @@ export default function ContentPage({ params }: { params: { id: string } }) {
 
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [shareSheet, setShareSheet] = useState<ShareSheetData | null>(null);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   async function shareItem() {
     if (!item) return;
@@ -107,8 +110,31 @@ export default function ContentPage({ params }: { params: { id: string } }) {
     });
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!item) return;
+
+    if (item.storage === "server") {
+      try {
+        const sessionRes = await supabase?.auth.getSession();
+        const token = sessionRes?.data?.session?.access_token;
+        if (token) {
+          await fetch(`/api/saved-items?id=${encodeURIComponent(item.id)}`,
+            {
+              method: "DELETE",
+              headers: {
+                authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        }
+      } catch {
+        // Ignore
+      }
+
+      setConfirmDeleteOpen(false);
+      window.location.href = "/library";
+      return;
+    }
 
     try {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY) : null;
