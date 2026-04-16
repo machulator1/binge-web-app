@@ -571,12 +571,12 @@ export default function LibraryPage() {
       </header>
 
       <main className="mx-auto w-full max-w-lg pb-10">
-        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
-        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
-        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
+        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
+        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
+        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Shared by friends" items={shareInboxItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
         <Row title="Daily AI Brief" items={dailyBriefItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
-        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
+        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
       </main>
 
       <ShareSheet open={Boolean(shareSheet)} data={shareSheet} onClose={() => setShareSheet(null)} />
