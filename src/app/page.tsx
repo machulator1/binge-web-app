@@ -711,17 +711,6 @@ export default function Home() {
               <div className="w-10" />
             </div>
             <div className="mt-3 text-sm leading-6 text-foreground/60">Find the right thing for this moment.</div>
-            {!sessionEmail ? (
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={() => setAuthOpen(true)}
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-foreground/80 transition duration-200 hover:bg-white/10 active:bg-white/12"
-                >
-                  Sign in
-                </button>
-              </div>
-            ) : null}
           </header>
 
           <section className="mt-14">
@@ -912,6 +901,18 @@ export default function Home() {
               />
               <div className="absolute right-0 top-12 z-50 w-52 overflow-hidden rounded-2xl border border-white/12 bg-slate-900/95 shadow-[0_30px_110px_rgba(0,0,0,0.62)] backdrop-blur">
                 <div className="p-2">
+                  {sessionEmail ? (
+                    <div className="px-3 pb-2 pt-1">
+                      <div className="text-[11px] font-semibold tracking-wide text-foreground/45">
+                        Signed in as
+                      </div>
+                      <div className="mt-1 truncate text-sm font-semibold text-foreground/80">
+                        {sessionEmail}
+                      </div>
+                      <div className="mt-2 h-px bg-white/10" />
+                    </div>
+                  ) : null}
+
                   {sessionEmail ? (
                     <Link
                       href="/profile"
