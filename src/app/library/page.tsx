@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
+import { SendToFriendSheet } from "@/components/SendToFriendSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
@@ -62,6 +63,14 @@ const MODALITY_PILL: Record<Modality, string> = {
   podcast: "bg-emerald-50 text-emerald-700 ring-emerald-200",
 };
 
+type SendPayload = {
+  url: string;
+  title: string;
+  summary?: string;
+  thumbnailUrl?: string;
+  source?: string;
+};
+
 function thumbDataUri(modality: Modality) {
   const accent =
     modality === "video" ? "#8b5cf6" : modality === "podcast" ? "#10b981" : "#3b82f6";
@@ -90,6 +99,7 @@ function Row({
   size,
   onOpen,
   onShare,
+  onSend,
   onDelete,
 }: {
   title: string;
@@ -97,6 +107,7 @@ function Row({
   size: "featured" | "default";
   onOpen: (item: QueueItem) => void;
   onShare: (item: QueueItem) => void;
+  onSend?: (item: QueueItem) => void;
   onDelete?: (item: QueueItem) => void;
 }) {
   if (items.length === 0) return null;
@@ -188,6 +199,30 @@ function Row({
                         />
                       </svg>
                     </button>
+
+                    {onSend ? (
+                      <button
+                        type="button"
+                        onClick={() => onSend(item)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-foreground/70 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/10 active:bg-white/12 active:text-foreground/90"
+                        aria-label="Send to friend"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                          <path
+                            d="M3.5 11.5 21 3.5l-8 17-2.5-7L3.5 11.5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M10.5 13.5 21 3.5"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    ) : null}
 
                     {onDelete ? (
                       <button
@@ -311,6 +346,7 @@ const INITIAL_ITEMS: QueueItem[] = [
 export default function LibraryPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [shareSheet, setShareSheet] = useState<ShareSheetData | null>(null);
+  const [sendSheet, setSendSheet] = useState<SendPayload | null>(null);
   const [shareInboxItems, setShareInboxItems] = useState<QueueItem[]>([]);
   const [dailyBriefItems, setDailyBriefItems] = useState<QueueItem[]>([]);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
@@ -490,6 +526,19 @@ export default function LibraryPage() {
     });
   }
 
+  function sendToFriend(item: QueueItem) {
+    if (!sessionToken) return;
+    const url = item.url ?? "";
+    if (!url) return;
+    setSendSheet({
+      url,
+      title: item.title,
+      summary: item.description,
+      thumbnailUrl: item.thumbnailUrl,
+      source: item.source,
+    });
+  }
+
   function deleteItem(item: QueueItem) {
     if (!confirm("Delete this item from your library?")) return;
 
@@ -525,12 +574,13 @@ export default function LibraryPage() {
         <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
         <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
         <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
-        <Row title="Shared by friends" items={shareInboxItems} size="default" onOpen={openInApp} onShare={shareItem} />
-        <Row title="Daily AI Brief" items={dailyBriefItems} size="default" onOpen={openInApp} onShare={shareItem} />
+        <Row title="Shared by friends" items={shareInboxItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
+        <Row title="Daily AI Brief" items={dailyBriefItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
         <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onDelete={deleteItem} />
       </main>
 
       <ShareSheet open={Boolean(shareSheet)} data={shareSheet} onClose={() => setShareSheet(null)} />
+      <SendToFriendSheet open={Boolean(sendSheet)} payload={sendSheet} onClose={() => setSendSheet(null)} />
     </div>
   );
 }
