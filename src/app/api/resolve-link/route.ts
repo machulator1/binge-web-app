@@ -43,13 +43,32 @@ function hostLabel(hostname: string) {
     .join(" ");
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&#x3A;/gi, ":")
+    .replace(/&#x3D;/gi, "=");
+}
+
 function extractOgTag(html: string, property: string) {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+  const metaRe = new RegExp(
+    `<meta\\b[^>]*?(?:property|name)=["']${property}["'][^>]*?>`,
     "i",
   );
-  const m = html.match(re);
-  return m?.[1] ?? null;
+  const metaMatch = html.match(metaRe);
+  const tag = metaMatch?.[0];
+  if (!tag) return null;
+
+  const contentMatch = tag.match(/\\bcontent=["']([^"']+)["']/i);
+  const content = contentMatch?.[1]?.trim();
+  if (!content) return null;
+  return decodeHtmlEntities(content);
 }
 
 function firstMetaContent(html: string, properties: string[]) {
