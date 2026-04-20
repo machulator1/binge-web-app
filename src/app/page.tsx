@@ -835,7 +835,7 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[68px] w-full rounded-[28px] border border-white/10 bg-slate-700/55 px-6 pr-16 text-[16px] font-semibold text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-slate-700/60 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
+                    className="h-[68px] w-full rounded-[28px] border border-white/10 bg-slate-700/55 px-6 pr-16 text-[15px] font-medium text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-slate-700/60 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
                     enterKeyHint="search"
                   />
                   <button
@@ -880,8 +880,8 @@ export default function Home() {
           </section>
 
           <section className="mt-6 grid gap-4">
-            <div className="px-1">
-              <div className="text-[13px] font-medium tracking-tight text-foreground/55">
+            <div className="px-1 text-center">
+              <div className="text-[15px] font-semibold tracking-tight text-foreground/70">
                 Best for your time right now
               </div>
             </div>
@@ -942,7 +942,7 @@ export default function Home() {
                           e.preventDefault();
                           openTodaysRecommendationInApp();
                         }}
-                        className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
+                        className="inline-flex h-11 min-w-28 items-center justify-center rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
                       >
                         Open
                       </button>
@@ -952,7 +952,7 @@ export default function Home() {
                           e.preventDefault();
                           void shareRecommendation();
                         }}
-                        className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/10 px-4 text-sm font-semibold text-foreground/85 transition duration-200 hover:bg-white/14 active:bg-white/16"
+                        className="inline-flex h-11 min-w-28 items-center justify-center rounded-2xl border border-white/14 bg-white/10 px-6 text-sm font-semibold text-foreground/85 transition duration-200 hover:bg-white/14 active:bg-white/16"
                       >
                         Share
                       </button>
