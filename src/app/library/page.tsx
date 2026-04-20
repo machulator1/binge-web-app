@@ -51,6 +51,7 @@ type BriefStory = {
 };
 
 const SAVED_ITEMS_STORAGE_KEY = "binge_saved_items_v1";
+const DAILY_BRIEF_DISMISSED_STORAGE_KEY = "binge_daily_brief_dismissed_v1";
 
 const MODALITY_LABEL: Record<Modality, string> = {
   article: "Article",
@@ -547,21 +548,34 @@ export default function LibraryPage() {
           return;
         }
 
-        const data = (await res.json()) as { stories?: BriefStory[] };
-        const stories = Array.isArray(data.stories) ? data.stories : [];
-        const mapped: QueueItem[] = stories.map((story) => ({
-          id: `ai_${story.id}`,
-          title: story.title,
-          url: story.url,
-          modality: "article",
-          durationMinutes: Math.max(1, story.readingTimeMinutes),
-          source: story.source,
-          savedBy: "Daily AI Brief",
-          status: "saved",
-          dateSaved: new Date().toISOString().slice(0, 10),
-          thumbnailUrl: story.thumbnailUrl,
-          description: story.summary,
-        }));
+        const json = (await res.json()) as { stories?: BriefStory[] };
+        const stories = Array.isArray(json.stories) ? (json.stories as BriefStory[]) : [];
+
+        let dismissed = new Set<string>();
+        try {
+          const raw = window.localStorage.getItem(DAILY_BRIEF_DISMISSED_STORAGE_KEY);
+          const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+          const ids = Array.isArray(parsed) ? (parsed as string[]) : [];
+          dismissed = new Set(ids.filter((id) => typeof id === "string" && id.trim()));
+        } catch {
+          // Ignore
+        }
+
+        const mapped = stories
+          .filter((story) => !dismissed.has(story.id))
+          .map((story) => ({
+            id: story.id,
+            title: story.title,
+            url: story.url,
+            modality: "article" as const,
+            durationMinutes: story.readingTimeMinutes,
+            source: story.source,
+            savedBy: "Daily Brief",
+            status: "saved" as const,
+            dateSaved: new Date().toISOString().slice(0, 10),
+            thumbnailUrl: story.thumbnailUrl,
+            description: story.summary,
+          }));
         if (!cancelled) setDailyBriefItems(mapped);
       } catch {
         if (!cancelled) setDailyBriefItems([]);
@@ -652,6 +666,16 @@ export default function LibraryPage() {
   function deleteDailyBriefItem(item: QueueItem) {
     if (!confirm("Remove this story from Daily AI Brief?")) return;
     setDailyBriefItems((prev) => prev.filter((it) => it.id !== item.id));
+
+    try {
+      const raw = window.localStorage.getItem(DAILY_BRIEF_DISMISSED_STORAGE_KEY);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      const ids = Array.isArray(parsed) ? (parsed as string[]) : [];
+      const next = Array.from(new Set([...ids, item.id])).slice(-500);
+      window.localStorage.setItem(DAILY_BRIEF_DISMISSED_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Ignore
+    }
   }
 
   return (
