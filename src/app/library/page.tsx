@@ -649,6 +649,11 @@ export default function LibraryPage() {
     }
   }
 
+  function deleteDailyBriefItem(item: QueueItem) {
+    if (!confirm("Remove this story from Daily AI Brief?")) return;
+    setDailyBriefItems((prev) => prev.filter((it) => it.id !== item.id));
+  }
+
   return (
     <div className="min-h-dvh overflow-x-hidden">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
@@ -673,7 +678,15 @@ export default function LibraryPage() {
         <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Shared by friends" items={shareInboxItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
-        <Row title="Daily AI Brief" items={dailyBriefItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
+        <Row
+          title="Daily AI Brief"
+          items={dailyBriefItems}
+          size="default"
+          onOpen={openInApp}
+          onShare={shareItem}
+          onSend={sessionToken ? sendToFriend : undefined}
+          onDelete={deleteDailyBriefItem}
+        />
         <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
       </main>
 
