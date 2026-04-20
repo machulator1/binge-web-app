@@ -52,6 +52,81 @@ function extractOgTag(html: string, property: string) {
   return m?.[1] ?? null;
 }
 
+function firstMetaContent(html: string, properties: string[]) {
+  for (const p of properties) {
+    const v = extractOgTag(html, p);
+    if (v && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function resolveUrl(candidate: string, baseUrl: string) {
+  const raw = candidate.trim();
+  if (!raw) return null;
+
+  try {
+    return new URL(raw, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyImageUrl(value: string) {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^data:/i.test(v)) return false;
+
+  try {
+    const u = new URL(v);
+    if (!(u.protocol === "http:" || u.protocol === "https:")) return false;
+
+    const lower = u.pathname.toLowerCase();
+    if (lower.endsWith(".svg")) return false;
+    if (lower.includes("favicon") || lower.includes("sprite")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function extractFirstImage(html: string, baseUrl: string) {
+  const imgRe = /<img\b[^>]*?\bsrc=["']([^"']+)["'][^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = imgRe.exec(html))) {
+    const src = match[1] ?? "";
+    const resolved = resolveUrl(src, baseUrl);
+    if (!resolved) continue;
+    if (!isLikelyImageUrl(resolved)) continue;
+    return resolved;
+  }
+  return null;
+}
+
+function domainThumbSvg({ hostname, modality }: { hostname: string; modality: Modality }) {
+  const safeHost = hostname.replace(/^www\./i, "");
+  const label = modality === "video" ? "Video" : modality === "podcast" ? "Podcast" : "Article";
+  const seed = Array.from(safeHost).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const hue = seed % 360;
+  const hue2 = (hue + 36) % 360;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="hsl(${hue} 70% 20%)"/>
+          <stop offset="0.65" stop-color="hsl(${hue2} 70% 26%)"/>
+          <stop offset="1" stop-color="#0a0a0a"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="675" rx="90" fill="url(#g)"/>
+      <rect x="70" y="70" width="1060" height="535" rx="66" fill="rgba(255,255,255,0.06)"/>
+      <text x="120" y="170" font-family="ui-sans-serif, system-ui, -apple-system" font-size="44" font-weight="700" fill="rgba(255,255,255,0.92)">${label}</text>
+      <text x="120" y="240" font-family="ui-sans-serif, system-ui, -apple-system" font-size="34" font-weight="600" fill="rgba(255,255,255,0.72)">${safeHost}</text>
+    </svg>
+  `.trim();
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 function extractTitle(html: string) {
   const og = extractOgTag(html, "og:title");
   if (og) return og;
@@ -67,9 +142,15 @@ function extractDescription(html: string) {
 }
 
 function extractImage(html: string) {
-  const og = extractOgTag(html, "og:image");
-  if (og) return og;
-  return null;
+  const raw = firstMetaContent(html, [
+    "og:image",
+    "og:image:url",
+    "og:image:secure_url",
+    "twitter:image",
+    "twitter:image:src",
+  ]);
+  if (!raw) return null;
+  return raw;
 }
 
 function canonicalUrl(html: string) {
@@ -132,8 +213,13 @@ export async function POST(req: Request) {
 
     const title = extractTitle(html) ?? "";
     const description = extractDescription(html) ?? undefined;
-    const image = extractImage(html) ?? undefined;
     const canon = canonicalUrl(html) ?? undefined;
+    const baseForImages = canon ?? input;
+    const ogImageRaw = extractImage(html);
+    const ogImage = ogImageRaw ? resolveUrl(ogImageRaw, baseForImages) : null;
+    const imageFromOg = ogImage && isLikelyImageUrl(ogImage) ? ogImage : null;
+    const imageFromPage = imageFromOg ? null : extractFirstImage(html, baseForImages);
+    const image = imageFromOg ?? imageFromPage ?? domainThumbSvg({ hostname: parsed.hostname, modality });
 
     return NextResponse.json<ResolvedLink>({
       url: input,
