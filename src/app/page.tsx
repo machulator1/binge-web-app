@@ -416,6 +416,7 @@ export default function Home() {
           headers: {
             authorization: `Bearer ${sessionToken}`,
           },
+          cache: "no-store",
         });
 
         if (!res.ok) {

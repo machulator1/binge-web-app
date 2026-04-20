@@ -58,13 +58,20 @@ function rowToItem(row: SavedItemRow) {
 
 export async function GET(req: Request) {
   const token = getBearerToken(req);
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!token)
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "cache-control": "no-store" } },
+    );
 
   try {
     const supabase = getSupabaseServerClient(token);
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: { "cache-control": "no-store" } },
+      );
     }
 
     const { data, error } = await supabase
@@ -80,9 +87,20 @@ export async function GET(req: Request) {
     const rows = Array.isArray(data) ? (data as SavedItemRow[]) : [];
     const items = rows.map(rowToItem);
 
-    return NextResponse.json({ items }, { status: 200 });
+    return NextResponse.json(
+      { items },
+      {
+        status: 200,
+        headers: {
+          "cache-control": "no-store",
+        },
+      },
+    );
   } catch {
-    return NextResponse.json({ error: "Failed to load" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load" },
+      { status: 500, headers: { "cache-control": "no-store" } },
+    );
   }
 }
 
