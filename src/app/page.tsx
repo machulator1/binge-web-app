@@ -835,7 +835,7 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[68px] w-full rounded-[28px] border border-white/10 bg-white/10 px-6 pr-16 text-[15px] font-medium text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-white/12 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
+                    className="h-[56px] w-full rounded-[28px] border border-white/10 bg-white/10 px-6 pr-16 text-[15px] font-medium text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-white/12 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
                     enterKeyHint="search"
                   />
                   <button
