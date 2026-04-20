@@ -702,18 +702,13 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-11">
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-6">
         <div className="flex-1">
-          <header className="text-center">
-            <div className="flex items-center justify-between">
-              <div className="w-10" />
-              <div className="text-[48px] font-extrabold tracking-tight text-foreground">Binge</div>
-              <div className="w-10" />
-            </div>
-            <div className="mt-3 text-sm leading-6 text-foreground/60">Find the right thing for this moment.</div>
+          <header className="flex items-center justify-start">
+            <div className="text-[20px] font-semibold tracking-tight text-foreground">Binge</div>
           </header>
 
-          <section className="mt-14">
+          <section className="mt-6">
             <form onSubmit={onSubmit}>
               <label className="block">
                 <span className="sr-only">Ask Binge</span>
