@@ -181,6 +181,7 @@ export default function Home() {
 
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
@@ -273,9 +274,11 @@ export default function Home() {
         const { data } = await sb.auth.getSession();
         if (!mounted) return;
         setSessionEmail(data.session?.user?.email ?? null);
+        setSessionToken(data.session?.access_token ?? null);
       } catch {
         if (!mounted) return;
         setSessionEmail(null);
+        setSessionToken(null);
       }
     }
 
@@ -283,6 +286,7 @@ export default function Home() {
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       setSessionEmail(session?.user?.email ?? null);
+      setSessionToken(session?.access_token ?? null);
     });
 
     return () => {
@@ -375,88 +379,98 @@ export default function Home() {
     }
   }
 
-  const fallbackRecommendation = useMemo<HomeRecommendation>(
-    () => ({
-      id: "today",
-      title: "AI Product Strategy Weekly",
-      modality: "podcast",
-      durationMinutes: 12,
-      sharedBy: "Rob",
-      url: "https://open.spotify.com/show/0l7qC9mP6dQm0y3x0SAMPLE",
-      description:
-        "A sharp 12-minute listen on practical AI strategy — what to measure early, where prototypes fail, and how to avoid feature debt.",
-      why: "A strong option that fits the moment.",
-      source: "Spotify",
-      thumbnailUrl: "https://picsum.photos/seed/binge-todays-reco/1200/675",
-    }),
-    [],
-  );
+  const recommendationThumbSrc = useMemo(() => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="512" height="288" viewBox="0 0 512 288">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#0a0a0a"/>
+            <stop offset="0.55" stop-color="#3f3f46"/>
+            <stop offset="1" stop-color="#6366f1"/>
+          </linearGradient>
+        </defs>
+        <rect width="512" height="288" rx="72" fill="url(#g)"/>
+        <g fill="rgba(255,255,255,0.92)">
+          <circle cx="332" cy="392" r="108" fill="rgba(255,255,255,0.14)"/>
+          <path d="M416 332c112 34 186 110 224 224" stroke="rgba(255,255,255,0.28)" stroke-width="54" stroke-linecap="round" fill="none"/>
+          <path d="M332 220c138 62 238 164 302 302" stroke="rgba(255,255,255,0.18)" stroke-width="54" stroke-linecap="round" fill="none"/>
+        </g>
+      </svg>
+    `.trim();
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }, []);
 
-  const [todaysRecommendation, setTodaysRecommendation] = useState<HomeRecommendation>(
-    fallbackRecommendation,
-  );
+  const [todaysRecommendation, setTodaysRecommendation] = useState<HomeRecommendation | null>(null);
 
   useEffect(() => {
-    function loadLatestSaved() {
+    let cancelled = false;
+
+    async function loadLatestSavedFromServer() {
+      if (!sessionToken) {
+        if (!cancelled) setTodaysRecommendation(null);
+        return;
+      }
+
       try {
-        const raw =
-          typeof window !== "undefined" ? window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY) : null;
-        const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-        const stored = Array.isArray(parsed) ? (parsed as SavedQueueItem[]) : [];
-
-        const sorted = [...stored]
-          .filter((it) => it && typeof it === "object")
-          .filter((it) => typeof it.id === "string" && typeof it.url === "string")
-          .sort((a, b) => {
-            const da = new Date(`${a.dateSaved}T00:00:00`).getTime();
-            const db = new Date(`${b.dateSaved}T00:00:00`).getTime();
-            if (da !== db) return db - da;
-            return String(b.id).localeCompare(String(a.id));
-          });
-
-        const latest = sorted[0];
-
-        if (!latest) return;
-
-        setTodaysRecommendation({
-          id: latest.id,
-          title: latest.title,
-          url: latest.url,
-          modality: latest.modality,
-          durationMinutes: latest.durationMinutes,
-          sharedBy: latest.savedBy,
-          description: latest.description ?? latest.notes ?? `A recent save from ${latest.source}.`,
-          why: "Latest item you saved to your library.",
-          source: latest.source,
-          thumbnailUrl: latest.thumbnailUrl,
+        const res = await fetch("/api/saved-items", {
+          headers: {
+            authorization: `Bearer ${sessionToken}`,
+          },
         });
+
+        if (!res.ok) {
+          if (!cancelled) setTodaysRecommendation(null);
+          return;
+        }
+
+        const data = (await res.json()) as {
+          items?: Array<{
+            id: string;
+            title: string;
+            url: string;
+            modality: SavedModality;
+            thumbnailUrl?: string;
+            durationMinutes: number;
+            source: string;
+            savedBy: string;
+            description?: string;
+          }>;
+        };
+
+        const items = Array.isArray(data.items) ? data.items : [];
+        const latest = items[0];
+        if (!latest?.id || !latest.url) {
+          if (!cancelled) setTodaysRecommendation(null);
+          return;
+        }
+
+        if (!cancelled) {
+          setTodaysRecommendation({
+            id: latest.id,
+            title: latest.title,
+            url: latest.url,
+            modality: latest.modality,
+            durationMinutes: latest.durationMinutes,
+            sharedBy: latest.savedBy,
+            description: latest.description ?? "",
+            why: "Latest item you saved to your library.",
+            source: latest.source,
+            thumbnailUrl: latest.thumbnailUrl ?? recommendationThumbSrc,
+          });
+        }
       } catch {
-        // Ignore
+        if (!cancelled) setTodaysRecommendation(null);
       }
     }
 
-    loadLatestSaved();
-
-    const onFocus = () => loadLatestSaved();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") loadLatestSaved();
-    };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === SAVED_ITEMS_STORAGE_KEY) loadLatestSaved();
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("storage", onStorage);
-
+    void loadLatestSavedFromServer();
     return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("storage", onStorage);
+      cancelled = true;
     };
-  }, [fallbackRecommendation]);
+  }, [sessionToken, recommendationThumbSrc]);
 
   function openTodaysRecommendationInApp({ navigate }: { navigate: boolean } = { navigate: true }) {
+    if (!todaysRecommendation) return;
     try {
       const payload = {
         id: todaysRecommendation.id,
@@ -485,28 +499,8 @@ export default function Home() {
     }
   }
 
-  const recommendationThumbSrc = useMemo(() => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="512" height="288" viewBox="0 0 512 288">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#0a0a0a"/>
-            <stop offset="0.55" stop-color="#3f3f46"/>
-            <stop offset="1" stop-color="#6366f1"/>
-          </linearGradient>
-        </defs>
-        <rect width="512" height="288" rx="72" fill="url(#g)"/>
-        <g fill="rgba(255,255,255,0.92)">
-          <circle cx="332" cy="392" r="108" fill="rgba(255,255,255,0.14)"/>
-          <path d="M416 332c112 34 186 110 224 224" stroke="rgba(255,255,255,0.28)" stroke-width="54" stroke-linecap="round" fill="none"/>
-          <path d="M332 220c138 62 238 164 302 302" stroke="rgba(255,255,255,0.18)" stroke-width="54" stroke-linecap="round" fill="none"/>
-        </g>
-      </svg>
-    `.trim();
-    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-  }, []);
-
   async function shareRecommendation() {
+    if (!todaysRecommendation) return;
     const url = todaysRecommendation.url;
     const text = `${todaysRecommendation.title}\n${url}`;
 
@@ -592,7 +586,7 @@ export default function Home() {
       const sessionRes = await supabase?.auth.getSession();
       const token = sessionRes?.data?.session?.access_token;
       if (token) {
-        await fetch("/api/saved-items", {
+        const res = await fetch("/api/saved-items", {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -612,6 +606,25 @@ export default function Home() {
             notes: item.notes,
           }),
         });
+
+        if (res.ok) {
+          const data = (await res.json()) as { item?: { id: string; title: string; url: string; modality: SavedModality; thumbnailUrl?: string; durationMinutes: number; source: string; savedBy: string; description?: string } };
+          const saved = data.item;
+          if (saved?.id && saved.url) {
+            setTodaysRecommendation({
+              id: saved.id,
+              title: saved.title,
+              url: saved.url,
+              modality: saved.modality,
+              durationMinutes: saved.durationMinutes,
+              sharedBy: saved.savedBy,
+              description: saved.description ?? "",
+              why: "Latest item you saved to your library.",
+              source: saved.source,
+              thumbnailUrl: saved.thumbnailUrl ?? item.thumbnailUrl,
+            });
+          }
+        }
       }
     } catch {
       // Ignore server persistence failures
@@ -769,75 +782,84 @@ export default function Home() {
               </div>
             </div>
 
-            <Link
-              href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
-              onClick={() => openTodaysRecommendationInApp({ navigate: false })}
-              className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/10 bg-slate-800/95 p-[14px] text-left shadow-[0_22px_82px_rgba(0,0,0,0.52)] transition duration-200 active:scale-[0.99] active:shadow-[0_20px_74px_rgba(0,0,0,0.66)]"
-            >
-              <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
+            {todaysRecommendation ? (
+              <Link
+                href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
+                onClick={() => openTodaysRecommendationInApp({ navigate: false })}
+                className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/10 bg-slate-800/95 p-[14px] text-left shadow-[0_22px_82px_rgba(0,0,0,0.52)] transition duration-200 active:scale-[0.99] active:shadow-[0_20px_74px_rgba(0,0,0,0.66)]"
+              >
+                <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
 
-              <div className="px-1">
-                <div className="text-lg font-semibold leading-7 text-foreground">
-                  {todaysRecommendation.title}
-                </div>
-              </div>
-
-              <div className="relative mt-3 overflow-hidden rounded-2xl ring-1 ring-white/10">
-                <div className="relative aspect-[16/9] w-full">
-                  <Image
-                    src={todaysRecommendation.thumbnailUrl}
-                    alt="Recommended content thumbnail"
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 512px"
-                    className="object-cover"
-                    priority
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-white/10 bg-slate-700/60 px-4 py-3">
-                <div className="line-clamp-2 text-sm leading-6 text-foreground/75">
-                  {todaysRecommendation.description}
-                </div>
-                <div className="mt-2 line-clamp-1 text-xs font-medium leading-5 text-foreground/50">
-                  {todaysRecommendation.why}
-                </div>
-
-                <div className="mt-4 flex items-end justify-between gap-3">
-                  <div className="flex min-w-0 flex-col gap-2">
-                    <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                      {todaysRecommendation.modality}
-                    </span>
-                    <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-white/5 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
-                      {todaysRecommendation.durationMinutes} min
-                    </span>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        openTodaysRecommendationInApp();
-                      }}
-                      className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-500/90 px-3 text-xs font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
-                    >
-                      Open
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void shareRecommendation();
-                      }}
-                      className="inline-flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-foreground/75 transition duration-200 hover:bg-white/10 active:bg-white/12"
-                    >
-                      Share
-                    </button>
+                <div className="px-1">
+                  <div className="text-lg font-semibold leading-7 text-foreground">
+                    {todaysRecommendation.title}
                   </div>
                 </div>
+
+                <div className="relative mt-3 overflow-hidden rounded-2xl ring-1 ring-white/10">
+                  <div className="relative aspect-[16/9] w-full">
+                    <Image
+                      src={todaysRecommendation.thumbnailUrl}
+                      alt="Recommended content thumbnail"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 512px"
+                      className="object-cover"
+                      priority
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-slate-700/60 px-4 py-3">
+                  <div className="line-clamp-2 text-sm leading-6 text-foreground/75">
+                    {todaysRecommendation.description}
+                  </div>
+                  <div className="mt-2 line-clamp-1 text-xs font-medium leading-5 text-foreground/50">
+                    {todaysRecommendation.why}
+                  </div>
+
+                  <div className="mt-4 flex items-end justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                        {todaysRecommendation.modality}
+                      </span>
+                      <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-white/5 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
+                        {todaysRecommendation.durationMinutes} min
+                      </span>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openTodaysRecommendationInApp();
+                        }}
+                        className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-500/90 px-3 text-xs font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void shareRecommendation();
+                        }}
+                        className="inline-flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-foreground/75 transition duration-200 hover:bg-white/10 active:bg-white/12"
+                      >
+                        Share
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div className="mx-2 rounded-[28px] border border-white/10 bg-slate-800/60 px-5 py-6 text-left shadow-[0_18px_70px_rgba(0,0,0,0.40)]">
+                <div className="text-sm font-semibold text-foreground/80">Save something to get started</div>
+                <div className="mt-2 text-sm leading-6 text-foreground/55">
+                  Your latest saved item will show up here.
+                </div>
               </div>
-            </Link>
+            )}
 
             <Link
               href="/library"
