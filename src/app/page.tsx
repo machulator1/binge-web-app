@@ -702,13 +702,13 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-6">
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-5">
         <div className="flex-1">
           <header className="flex items-center justify-start">
-            <div className="text-[20px] font-semibold tracking-tight text-foreground">Binge</div>
+            <div className="text-[18px] font-medium tracking-tight text-foreground/80">Binge</div>
           </header>
 
-          <section className="mt-6">
+          <section className="mt-4">
             <form onSubmit={onSubmit}>
               <label className="block">
                 <span className="sr-only">Ask Binge</span>
@@ -718,7 +718,7 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[92px] w-full rounded-[28px] border border-white/14 bg-slate-700/75 px-7 pr-14 text-[17px] font-semibold text-foreground shadow-[0_26px_105px_rgba(0,0,0,0.62)] outline-none placeholder:text-foreground/35 focus:border-white/18 focus:bg-slate-700/80 focus:shadow-[0_30px_126px_rgba(0,0,0,0.70)]"
+                    className="h-[92px] w-full rounded-[28px] border border-white/10 bg-slate-700/55 px-7 pr-14 text-[17px] font-semibold text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-slate-700/60 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
                     enterKeyHint="search"
                   />
                   <button
@@ -764,7 +764,7 @@ export default function Home() {
 
           <section className="mt-10 grid gap-6">
             <div className="px-1">
-              <div className="text-[22px] font-semibold tracking-tight text-foreground">
+              <div className="text-[18px] font-medium tracking-tight text-foreground/75">
                 Today’s Recommendation
               </div>
             </div>
@@ -772,7 +772,7 @@ export default function Home() {
             <Link
               href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
               onClick={() => openTodaysRecommendationInApp({ navigate: false })}
-              className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/12 bg-slate-800/95 p-4 text-left shadow-[0_26px_96px_rgba(0,0,0,0.58)] transition duration-200 active:scale-[0.99] active:shadow-[0_22px_84px_rgba(0,0,0,0.70)]"
+              className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/10 bg-slate-800/95 p-[14px] text-left shadow-[0_22px_82px_rgba(0,0,0,0.52)] transition duration-200 active:scale-[0.99] active:shadow-[0_20px_74px_rgba(0,0,0,0.66)]"
             >
               <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
 
