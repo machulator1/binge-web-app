@@ -402,6 +402,27 @@ export default function Home() {
 
   const [todaysRecommendation, setTodaysRecommendation] = useState<HomeRecommendation | null>(null);
 
+  const todaysRecommendationTitle = useMemo(() => {
+    const raw = (todaysRecommendation?.title ?? "").trim();
+    const url = (todaysRecommendation?.url ?? "").trim();
+    if (!raw) return "";
+    if (url && raw === url) return "";
+    if (/^A Great\b/i.test(raw)) return "";
+    if (/\bWorth Saving\b/i.test(raw)) return "";
+    if (/^A Smart\b/i.test(raw)) return "";
+    if (/^A clean\b/i.test(raw)) return "";
+    return raw;
+  }, [todaysRecommendation?.title, todaysRecommendation?.url]);
+
+  const todaysRecommendationDescription = useMemo(() => {
+    const raw = (todaysRecommendation?.description ?? "").trim();
+    if (!raw) return "";
+    if (/^A short\b/i.test(raw)) return "";
+    if (/^A focused\b/i.test(raw)) return "";
+    if (/^A clean\b/i.test(raw)) return "";
+    return raw;
+  }, [todaysRecommendation?.description]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -716,13 +737,13 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-5">
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col pl-5 pr-16 pb-7 pt-4">
         <div className="flex-1">
           <header className="flex items-center justify-start">
-            <div className="text-[18px] font-medium tracking-tight text-foreground/80">Binge</div>
+            <div className="text-[15px] font-semibold tracking-[-0.04em] text-foreground/90">BINGE</div>
           </header>
 
-          <section className="mt-4">
+          <section className="mt-3">
             <form onSubmit={onSubmit}>
               <label className="block">
                 <span className="sr-only">Ask Binge</span>
@@ -732,7 +753,7 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[92px] w-full rounded-[28px] border border-white/10 bg-slate-700/55 px-7 pr-14 text-[17px] font-semibold text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-slate-700/60 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
+                    className="h-[68px] w-full rounded-[28px] border border-white/10 bg-slate-700/55 px-6 pr-16 text-[16px] font-semibold text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-slate-700/60 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
                     enterKeyHint="search"
                   />
                   <button
@@ -746,9 +767,9 @@ export default function Home() {
                           : "Start voice input"
                         : "Voice input not supported"
                     }
-                    className={`absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-slate-700/75 text-foreground/70 transition duration-200 ${
-                      speechSupported ? "hover:bg-white/10 active:bg-white/12" : "opacity-40"
-                    } ${isListening ? "text-blue-200 ring-1 ring-blue-300/30" : ""}`}
+                    className={`absolute right-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center text-foreground/70 transition duration-200 ${
+                      speechSupported ? "hover:text-foreground/90 active:text-foreground" : "opacity-40"
+                    } ${isListening ? "text-blue-200" : ""}`}
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                       <path
@@ -776,10 +797,10 @@ export default function Home() {
             </form>
           </section>
 
-          <section className="mt-10 grid gap-6">
+          <section className="mt-6 grid gap-4">
             <div className="px-1">
-              <div className="text-[18px] font-medium tracking-tight text-foreground/75">
-                Today’s Recommendation
+              <div className="text-[13px] font-medium tracking-tight text-foreground/55">
+                Best for your time right now
               </div>
             </div>
 
@@ -792,9 +813,11 @@ export default function Home() {
                 <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
 
                 <div className="px-1">
-                  <div className="text-lg font-semibold leading-7 text-foreground">
-                    {todaysRecommendation.title}
-                  </div>
+                  {todaysRecommendationTitle ? (
+                    <div className="text-[17px] font-semibold leading-7 text-foreground">
+                      {todaysRecommendationTitle}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="relative mt-3 overflow-hidden rounded-2xl ring-1 ring-white/10">
@@ -810,10 +833,12 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-slate-700/60 px-4 py-3">
-                  <div className="line-clamp-2 text-sm leading-6 text-foreground/75">
-                    {todaysRecommendation.description}
-                  </div>
+                <div className="mt-3 rounded-2xl border border-white/10 bg-slate-700/60 px-4 py-3">
+                  {todaysRecommendationDescription ? (
+                    <div className="line-clamp-2 text-sm leading-6 text-foreground/75">
+                      {todaysRecommendationDescription}
+                    </div>
+                  ) : null}
                   <div className="mt-2 line-clamp-1 text-xs font-medium leading-5 text-foreground/50">
                     {todaysRecommendation.why}
                   </div>
@@ -828,14 +853,14 @@ export default function Home() {
                       </span>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-3">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           openTodaysRecommendationInApp();
                         }}
-                        className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-500/90 px-3 text-xs font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
+                        className="inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
                       >
                         Open
                       </button>
@@ -845,7 +870,7 @@ export default function Home() {
                           e.preventDefault();
                           void shareRecommendation();
                         }}
-                        className="inline-flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-foreground/75 transition duration-200 hover:bg-white/10 active:bg-white/12"
+                        className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/14 bg-white/10 px-4 text-sm font-semibold text-foreground/85 transition duration-200 hover:bg-white/14 active:bg-white/16"
                       >
                         Share
                       </button>
@@ -886,12 +911,12 @@ export default function Home() {
           </section>
         </div>
 
-        <footer className="mt-10 text-center text-xs font-medium text-foreground/30">
+        <footer className="mt-6 text-center text-xs font-medium text-foreground/30">
           Minimal prototype • No backend yet
         </footer>
       </main>
 
-      <div className="fixed right-4 z-50" style={{ top: "calc(env(safe-area-inset-top) + 16px)" }}>
+      <div className="fixed right-4 z-50" style={{ top: "calc(env(safe-area-inset-top) + 18px)" }}>
         <div className="relative">
           <button
             type="button"
