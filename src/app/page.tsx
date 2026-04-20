@@ -737,13 +737,95 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col pl-5 pr-16 pb-7 pt-4">
-        <div className="flex-1">
-          <header className="flex items-center justify-start">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+        <div className="mx-auto w-full max-w-lg px-5 py-3">
+          <div className="flex items-center justify-between">
             <div className="text-[15px] font-semibold tracking-[-0.04em] text-foreground/90">BINGE</div>
-          </header>
 
-          <section className="mt-3">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Menu"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-foreground/85 shadow-[0_18px_65px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white/10 active:bg-white/12"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                  <path
+                    d="M5 7h14M5 12h14M5 17h14"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+
+              {menuOpen ? (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    onClick={() => setMenuOpen(false)}
+                    className="fixed inset-0 z-40 cursor-default"
+                  />
+                  <div className="absolute right-0 top-12 z-50 w-52 overflow-hidden rounded-2xl border border-white/12 bg-slate-900/95 shadow-[0_30px_110px_rgba(0,0,0,0.62)] backdrop-blur">
+                    <div className="p-2">
+                      {sessionEmail ? (
+                        <div className="px-3 pb-2 pt-1">
+                          <div className="text-[11px] font-semibold tracking-wide text-foreground/45">
+                            Signed in as
+                          </div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground/80">
+                            {sessionEmail}
+                          </div>
+                          <div className="mt-2 h-px bg-white/10" />
+                        </div>
+                      ) : null}
+
+                      {sessionEmail ? (
+                        <Link
+                          href="/profile"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
+                        >
+                          Profile
+                        </Link>
+                      ) : null}
+
+                      {sessionEmail ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            void signOut();
+                          }}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
+                        >
+                          Switch account
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setAuthOpen(true);
+                          }}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
+                        >
+                          Sign in
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-7 pt-4">
+        <div className="flex-1">
+          <section className="mt-7">
             <form onSubmit={onSubmit}>
               <label className="block">
                 <span className="sr-only">Ask Binge</span>
@@ -915,86 +997,6 @@ export default function Home() {
           Minimal prototype • No backend yet
         </footer>
       </main>
-
-      <div className="fixed right-4 z-50" style={{ top: "calc(env(safe-area-inset-top) + 18px)" }}>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Menu"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-slate-900/70 text-foreground/80 shadow-[0_18px_65px_rgba(0,0,0,0.55)] backdrop-blur transition duration-200 hover:bg-slate-900/80 active:bg-slate-900/90"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-              <path
-                d="M5 7h14M5 12h14M5 17h14"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-
-          {menuOpen ? (
-            <>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setMenuOpen(false)}
-                className="fixed inset-0 z-40 cursor-default"
-              />
-              <div className="absolute right-0 top-12 z-50 w-52 overflow-hidden rounded-2xl border border-white/12 bg-slate-900/95 shadow-[0_30px_110px_rgba(0,0,0,0.62)] backdrop-blur">
-                <div className="p-2">
-                  {sessionEmail ? (
-                    <div className="px-3 pb-2 pt-1">
-                      <div className="text-[11px] font-semibold tracking-wide text-foreground/45">
-                        Signed in as
-                      </div>
-                      <div className="mt-1 truncate text-sm font-semibold text-foreground/80">
-                        {sessionEmail}
-                      </div>
-                      <div className="mt-2 h-px bg-white/10" />
-                    </div>
-                  ) : null}
-
-                  {sessionEmail ? (
-                    <Link
-                      href="/profile"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
-                    >
-                      Profile
-                    </Link>
-                  ) : null}
-
-                  {sessionEmail ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        void signOut();
-                      }}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
-                    >
-                      Switch account
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setAuthOpen(true);
-                      }}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-white/10"
-                    >
-                      Sign in
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
 
       {saveDraft ? (
         <div className="fixed inset-0 z-50">
