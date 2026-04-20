@@ -829,13 +829,13 @@ export default function Home() {
             <form onSubmit={onSubmit}>
               <label className="block">
                 <span className="sr-only">Ask Binge</span>
-                <div className="relative">
+                <div className="relative mx-2">
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[56px] w-full rounded-[28px] border border-white/10 bg-white/10 px-6 pr-16 text-[15px] font-medium text-foreground shadow-[0_22px_88px_rgba(0,0,0,0.55)] outline-none placeholder:text-foreground/35 focus:border-white/14 focus:bg-white/12 focus:shadow-[0_24px_100px_rgba(0,0,0,0.62)]"
+                    className="h-[56px] w-full rounded-[28px] border border-white/20 bg-slate-900/75 px-6 pr-16 text-[15px] font-medium text-foreground shadow-[0_18px_70px_rgba(0,0,0,0.55)] ring-1 ring-white/10 outline-none placeholder:text-foreground/35 focus:border-white/28 focus:bg-slate-900/80 focus:ring-white/18"
                     enterKeyHint="search"
                   />
                   <button
@@ -879,9 +879,9 @@ export default function Home() {
             </form>
           </section>
 
-          <section className="mt-6 grid gap-4">
+          <section className="mt-8 grid gap-4">
             <div className="px-1 text-center">
-              <div className="text-[15px] font-semibold tracking-tight text-foreground/70">
+              <div className="text-[13px] font-medium tracking-tight text-foreground/50">
                 Best for your time right now
               </div>
             </div>
@@ -971,12 +971,10 @@ export default function Home() {
 
             <Link
               href="/library"
-              className="relative overflow-hidden rounded-[28px] border border-white/12 bg-slate-800/95 px-4 py-4 shadow-[0_28px_96px_rgba(0,0,0,0.64)] transition duration-200 active:scale-[0.995]"
+              className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_16px_60px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white/8 active:scale-[0.995]"
             >
-              <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_18%_20%,rgba(16,185,129,0.08),transparent_60%)] opacity-35" />
-
               <div className="relative flex items-center justify-center">
-                <div className="text-lg font-semibold leading-7 text-foreground">My Library</div>
+                <div className="text-base font-semibold leading-7 text-foreground/85">My Library</div>
                 <div className="pointer-events-none absolute right-4 text-foreground/50">
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                     <path
