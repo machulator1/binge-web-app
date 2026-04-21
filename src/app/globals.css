@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #16274a;
+  --background: #1b315a;
   --foreground: #edf0f6;
 }
 
@@ -14,7 +14,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #16274a;
+    --background: #1b315a;
     --foreground: #edf0f6;
   }
 }
@@ -22,9 +22,9 @@
 html {
   background: linear-gradient(
     180deg,
-    #223a66 0%,
-    #1b315a 40%,
-    #162a4f 100%
+    #2a467a 0%,
+    #223a66 40%,
+    #1b315a 100%
   );
   color: var(--foreground);
 }
@@ -32,9 +32,9 @@ html {
 body {
   background: linear-gradient(
     180deg,
-    #223a66 0%,
-    #1b315a 40%,
-    #162a4f 100%
+    #2a467a 0%,
+    #223a66 40%,
+    #1b315a 100%
   );
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
