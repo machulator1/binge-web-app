@@ -195,26 +195,12 @@ export async function POST(req: Request) {
     const modality = guessModalityFromUrl(parsed);
     const source = hostLabel(parsed.hostname);
 
-    if (modality === "video") {
-      const id =
-        parsed.hostname.toLowerCase().includes("youtu.be")
+    const youtubeId =
+      modality === "video"
+        ? parsed.hostname.toLowerCase().includes("youtu.be")
           ? parsed.pathname.split("/").filter(Boolean)[0]
-          : parsed.searchParams.get("v");
-
-      if (id) {
-        const image = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-        return NextResponse.json<ResolvedLink>({
-          url: input,
-          canonicalUrl: input,
-          title: "",
-          description: undefined,
-          image,
-          source: "YouTube",
-          modality,
-          provider: "youtube",
-        });
-      }
-    }
+          : parsed.searchParams.get("v")
+        : null;
 
     const res = await fetch(input, {
       redirect: "follow",
@@ -238,7 +224,10 @@ export async function POST(req: Request) {
     const ogImage = ogImageRaw ? resolveUrl(ogImageRaw, baseForImages) : null;
     const imageFromOg = ogImage && isLikelyImageUrl(ogImage) ? ogImage : null;
     const imageFromPage = imageFromOg ? null : extractFirstImage(html, baseForImages);
-    const image = imageFromOg ?? imageFromPage ?? domainThumbSvg({ hostname: parsed.hostname, modality });
+
+    const youtubeFallbackImage = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : null;
+    const image =
+      imageFromOg ?? imageFromPage ?? youtubeFallbackImage ?? domainThumbSvg({ hostname: parsed.hostname, modality });
 
     return NextResponse.json<ResolvedLink>({
       url: input,

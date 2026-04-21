@@ -157,7 +157,7 @@ function buildMockSavedItem(rawUrl: string): Omit<SavedQueueItem, "id" | "savedB
   const source = hostLabel(url.hostname);
   const title = mockTitle(modality, source);
   const durationMinutes = mockDuration(modality);
-  const description = mockDescription(modality, source);
+  const description = "";
   const thumbnailUrl = `https://picsum.photos/seed/${encodeURIComponent(url.hostname + url.pathname)}/960/540`;
   const dateSaved = new Date().toISOString().slice(0, 10);
 
