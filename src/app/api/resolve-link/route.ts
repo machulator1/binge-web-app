@@ -87,6 +87,61 @@ function extractYouTubeShortDescription(html: string) {
   return trimmed ? trimmed : null;
 }
 
+function isGenericYouTubeTitle(value: string) {
+  const v = value.trim();
+  if (!v) return true;
+  if (/^youtube$/i.test(v)) return true;
+  return false;
+}
+
+function isGenericYouTubeDescription(value: string) {
+  const v = value.trim();
+  if (!v) return true;
+  if (/^enjoy the videos and music you love/i.test(v)) return true;
+  return false;
+}
+
+function extractJsonObjectAfterMarker(html: string, marker: string) {
+  const idx = html.indexOf(marker);
+  if (idx < 0) return null;
+
+  const braceStart = html.indexOf("{", idx);
+  if (braceStart < 0) return null;
+
+  let depth = 0;
+  for (let i = braceStart; i < html.length; i += 1) {
+    const ch = html[i];
+    if (ch === "{") depth += 1;
+    if (ch === "}") depth -= 1;
+    if (depth === 0) {
+      const slice = html.slice(braceStart, i + 1);
+      try {
+        return JSON.parse(slice) as unknown;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractYouTubeVideoDetails(html: string) {
+  const parsed = extractJsonObjectAfterMarker(html, "ytInitialPlayerResponse");
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const root = parsed as { videoDetails?: { title?: string; shortDescription?: string } };
+  const details = root.videoDetails;
+  if (!details) return null;
+
+  const title = (details.title ?? "").trim();
+  const description = (details.shortDescription ?? "").trim();
+  return {
+    title: title ? title : null,
+    description: description ? description : null,
+  };
+}
+
 function extractOgTag(html: string, property: string) {
   const metaRe = new RegExp(
     `<meta\\b[^>]*?(?:property|name)=["']${property}["'][^>]*?>`,
@@ -248,10 +303,23 @@ export async function POST(req: Request) {
 
     const html = await res.text();
 
-    const title = extractTitle(html) ?? "";
+    const ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
+
+    const ogOrDocTitle = extractTitle(html) ?? "";
+    const title =
+      youtubeId && isGenericYouTubeTitle(ogOrDocTitle)
+        ? (ytDetails?.title ?? "")
+        : ogOrDocTitle;
+
     const ogOrMetaDescription = extractDescription(html) ?? null;
-    const descriptionFromYouTube = youtubeId ? extractYouTubeShortDescription(html) : null;
-    const description = (ogOrMetaDescription ?? descriptionFromYouTube ?? undefined) ?? undefined;
+    const descriptionFromYouTube = youtubeId
+      ? (ytDetails?.description ?? extractYouTubeShortDescription(html))
+      : null;
+    const description = youtubeId
+      ? (ogOrMetaDescription && !isGenericYouTubeDescription(ogOrMetaDescription)
+          ? ogOrMetaDescription
+          : descriptionFromYouTube ?? undefined)
+      : (ogOrMetaDescription ?? undefined);
     const canon = canonicalUrl(html) ?? undefined;
     const baseForImages = canon ?? input;
     const ogImageRaw = extractImage(html);
