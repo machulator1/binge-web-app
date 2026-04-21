@@ -56,6 +56,37 @@ function decodeHtmlEntities(value: string) {
     .replace(/&#x3D;/gi, "=");
 }
 
+function decodeJsonStringLiteral(value: string) {
+  const raw = value.trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(`"${raw.replace(/\\"/g, '\\\\"')}"`) as string;
+  } catch {
+    try {
+      return raw
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "")
+        .replace(/\\t/g, "\t")
+        .replace(/\\u0026/g, "&")
+        .replace(/\\u003c/g, "<")
+        .replace(/\\u003e/g, ">")
+        .replace(/\\u003d/g, "=")
+        .replace(/\\\\/g, "\\");
+    } catch {
+      return null;
+    }
+  }
+}
+
+function extractYouTubeShortDescription(html: string) {
+  const m = html.match(/\bshortDescription\":\"([^\"]+)\"/i);
+  const captured = m?.[1];
+  if (!captured) return null;
+  const decoded = decodeJsonStringLiteral(captured);
+  const trimmed = (decoded ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
 function extractOgTag(html: string, property: string) {
   const metaRe = new RegExp(
     `<meta\\b[^>]*?(?:property|name)=["']${property}["'][^>]*?>`,
@@ -207,6 +238,7 @@ export async function POST(req: Request) {
       headers: {
         "user-agent": "binge/0.1 (metadata resolver)",
         accept: "text/html,application/xhtml+xml",
+        "accept-language": "en-US,en;q=0.9",
       },
     });
 
@@ -217,7 +249,9 @@ export async function POST(req: Request) {
     const html = await res.text();
 
     const title = extractTitle(html) ?? "";
-    const description = extractDescription(html) ?? undefined;
+    const ogOrMetaDescription = extractDescription(html) ?? null;
+    const descriptionFromYouTube = youtubeId ? extractYouTubeShortDescription(html) : null;
+    const description = (ogOrMetaDescription ?? descriptionFromYouTube ?? undefined) ?? undefined;
     const canon = canonicalUrl(html) ?? undefined;
     const baseForImages = canon ?? input;
     const ogImageRaw = extractImage(html);

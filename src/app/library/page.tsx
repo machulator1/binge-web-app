@@ -535,6 +535,8 @@ export default function LibraryPage() {
           const url = it.url.toLowerCase();
           const isYoutube = url.includes("youtube.com") || url.includes("youtu.be");
           if (!isYoutube) return false;
+          const hasDescription = Boolean((it.description ?? "").trim());
+          if (!hasDescription) return true;
           if (isPlaceholderTitle(it.title)) return true;
           if (isPlaceholderDescription(it.description)) return true;
           return false;
