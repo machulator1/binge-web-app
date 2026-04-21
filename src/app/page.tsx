@@ -921,11 +921,8 @@ export default function Home() {
                       {todaysRecommendationDescription}
                     </div>
                   ) : null}
-                  <div className="mt-2 line-clamp-1 text-xs font-medium leading-5 text-foreground/50">
-                    {todaysRecommendation.why}
-                  </div>
 
-                  <div className="mt-4 flex items-end justify-between gap-3">
+                  <div className="mt-3 flex items-end justify-between gap-3">
                     <div className="flex min-w-0 flex-col gap-2">
                       <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
                         {todaysRecommendation.modality}
