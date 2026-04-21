@@ -740,7 +740,12 @@ export default function Home() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-lg px-5 py-3">
           <div className="flex items-center justify-between">
-            <div className="text-[15px] font-semibold tracking-[-0.04em] text-foreground/90">BINGE</div>
+            <div
+              className="text-[17px] font-semibold tracking-[-0.04em] text-foreground/90"
+              style={{ fontFamily: "Calibri, Arial, Helvetica, sans-serif" }}
+            >
+              BINGE WITH ME
+            </div>
 
             <div className="relative">
               <button
