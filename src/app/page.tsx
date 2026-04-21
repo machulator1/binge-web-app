@@ -971,7 +971,7 @@ export default function Home() {
 
             <Link
               href="/library"
-              className="relative overflow-hidden rounded-[22px] border border-white/12 bg-white/6 px-4 py-4 shadow-[0_16px_60px_rgba(0,0,0,0.40)] transition duration-200 hover:bg-white/10 active:scale-[0.995]"
+              className="relative mx-2 overflow-hidden rounded-[22px] border border-white/12 bg-white/6 px-4 py-4 shadow-[0_16px_60px_rgba(0,0,0,0.40)] transition duration-200 hover:bg-white/10 active:scale-[0.995]"
             >
               <div className="relative flex items-center justify-center">
                 <div className="text-base font-semibold leading-7 text-foreground/85">My Library</div>
