@@ -134,9 +134,9 @@ function modalityFromUrl(url: URL): SavedModality {
 }
 
 function mockTitle(modality: SavedModality, source: string) {
-  if (modality === "video") return `A Great ${source} Watch (Worth Saving)`;
-  if (modality === "podcast") return `${source}: A Short Episode for Later`;
-  return `A Smart ${source} Read for Later`;
+  if (modality === "video") return `${source} video`;
+  if (modality === "podcast") return `${source} podcast`;
+  return `${source} article`;
 }
 
 function mockDuration(modality: SavedModality) {
@@ -146,16 +146,28 @@ function mockDuration(modality: SavedModality) {
 }
 
 function mockDescription(modality: SavedModality, source: string) {
-  if (modality === "video") return `A short ${source} video that’s easy to pick up later.`;
-  if (modality === "podcast") return `A focused ${source} episode — perfect for a quick listen.`;
-  return `A clean ${source} read worth saving for a calmer moment.`;
+  void modality;
+  void source;
+  return "";
+}
+
+function minimalTitleFromUrl(url: URL) {
+  const host = hostLabel(url.hostname);
+  const lastSegment = url.pathname
+    .split("/")
+    .filter(Boolean)
+    .slice(-1)[0];
+  const segment = lastSegment ? decodeURIComponent(lastSegment).replace(/[-_]+/g, " ") : "";
+  const cleaned = segment.replace(/\.(html?|php|aspx?)$/i, "").trim();
+  if (cleaned && cleaned.length >= 3) return cleaned;
+  return host;
 }
 
 function buildMockSavedItem(rawUrl: string): Omit<SavedQueueItem, "id" | "savedBy" | "notes"> {
   const url = new URL(normalizeUrl(rawUrl));
   const modality = modalityFromUrl(url);
   const source = hostLabel(url.hostname);
-  const title = mockTitle(modality, source);
+  const title = minimalTitleFromUrl(url);
   const durationMinutes = mockDuration(modality);
   const description = "";
   const thumbnailUrl = `https://picsum.photos/seed/${encodeURIComponent(url.hostname + url.pathname)}/960/540`;
@@ -691,10 +703,12 @@ export default function Home() {
 
       setSaveDraft((prev) => {
         if (!prev) return prev;
+        const nextTitle = (data.title ?? "").trim();
+        const nextDescription = (data.description ?? "").trim();
         return {
           ...prev,
-          title: data.title || prev.title,
-          description: data.description ?? prev.description,
+          title: nextTitle ? nextTitle : prev.title,
+          description: nextDescription ? nextDescription : prev.description,
           modality: data.modality || prev.modality,
           durationMinutes: data.durationMinutes ?? prev.durationMinutes,
           source: data.source ?? prev.source,

@@ -73,6 +73,37 @@ type SendPayload = {
   source?: string;
 };
 
+type ResolvedLink = {
+  url: string;
+  title: string;
+  description?: string;
+  image?: string;
+  source?: string;
+  modality: Modality;
+  durationMinutes?: number;
+  provider?: string;
+  canonicalUrl?: string;
+};
+
+function isPlaceholderTitle(raw: string) {
+  const v = raw.trim();
+  if (!v) return true;
+  if (/^A Great\b/i.test(v)) return true;
+  if (/\bWorth Saving\b/i.test(v)) return true;
+  if (/^A Smart\b/i.test(v)) return true;
+  if (/^YouTube\s+video$/i.test(v)) return true;
+  return false;
+}
+
+function isPlaceholderDescription(raw?: string) {
+  const v = (raw ?? "").trim();
+  if (!v) return false;
+  if (/^A short\b/i.test(v)) return true;
+  if (/^A focused\b/i.test(v)) return true;
+  if (/^A clean\b/i.test(v)) return true;
+  return false;
+}
+
 function thumbDataUri(modality: Modality) {
   const accent =
     modality === "video" ? "#8b5cf6" : modality === "podcast" ? "#10b981" : "#3b82f6";
@@ -146,7 +177,7 @@ function Row({
                 </div>
 
                 {item.description ? (
-                  <div className="mt-1 line-clamp-1 text-xs font-medium leading-5 text-foreground/55">
+                  <div className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-foreground/55">
                     {item.description}
                   </div>
                 ) : null}
@@ -493,6 +524,96 @@ export default function LibraryPage() {
       sub.subscription.unsubscribe();
     };
   }, [supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function repairMetadata() {
+      const candidates = items
+        .filter((it) => {
+          if (!it.url) return false;
+          const url = it.url.toLowerCase();
+          const isYoutube = url.includes("youtube.com") || url.includes("youtu.be");
+          if (!isYoutube) return false;
+          if (isPlaceholderTitle(it.title)) return true;
+          if (isPlaceholderDescription(it.description)) return true;
+          return false;
+        })
+        .slice(0, 10);
+
+      for (const item of candidates) {
+        if (cancelled) return;
+
+        try {
+          const res = await fetch("/api/resolve-link", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: item.url }),
+          });
+          if (!res.ok) continue;
+
+          const data = (await res.json()) as ResolvedLink;
+          const nextTitle = (data.title ?? "").trim();
+          const nextDescription = (data.description ?? "").trim();
+
+          const patched: QueueItem = {
+            ...item,
+            title: nextTitle ? nextTitle : item.title,
+            description: nextDescription ? nextDescription : item.description,
+            thumbnailUrl: data.image ?? item.thumbnailUrl,
+            source: data.source ?? item.source,
+            modality: data.modality ?? item.modality,
+          };
+
+          if (cancelled) return;
+
+          setItems((prev) => prev.map((it) => (it.id === item.id ? patched : it)));
+
+          if (item.storage === "server" && sessionToken) {
+            void fetch("/api/saved-items", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                authorization: `Bearer ${sessionToken}`,
+              },
+              body: JSON.stringify({
+                url: patched.url,
+                title: patched.title,
+                modality: patched.modality,
+                thumbnailUrl: patched.thumbnailUrl,
+                durationMinutes: patched.durationMinutes,
+                source: patched.source,
+                savedBy: patched.savedBy,
+                status: patched.status,
+                dateSaved: patched.dateSaved,
+                description: patched.description,
+                notes: patched.notes,
+              }),
+            });
+          }
+
+          if (item.storage !== "server") {
+            try {
+              const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY);
+              const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+              const stored = Array.isArray(parsed) ? (parsed as QueueItem[]) : [];
+              const next = stored.map((it) => (it.id === item.id ? { ...patched, storage: it.storage } : it));
+              window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify(next));
+            } catch {
+              // Ignore
+            }
+          }
+        } catch {
+          // Ignore per-item failures
+        }
+      }
+    }
+
+    void repairMetadata();
+    return () => {
+      cancelled = true;
+    };
+  }, [items, sessionToken]);
 
   useEffect(() => {
     let cancelled = false;
