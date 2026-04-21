@@ -17,6 +17,63 @@ type ResolvedLink = {
   canonicalUrl?: string;
 };
 
+function parseIso8601DurationMinutes(value: string | null | undefined) {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const m = raw.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i);
+  if (!m) return null;
+  const hours = Number(m[1] ?? 0);
+  const minutes = Number(m[2] ?? 0);
+  const seconds = Number(m[3] ?? 0);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
+  const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+  if (totalSeconds <= 0) return null;
+  return Math.max(1, Math.round(totalSeconds / 60));
+}
+
+async function fetchYouTubeDataApi(videoId: string, apiKey: string) {
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${encodeURIComponent(
+    videoId,
+  )}&key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    items?: Array<{
+      snippet?: {
+        title?: string;
+        description?: string;
+        thumbnails?: Record<string, { url?: string }>;
+        channelTitle?: string;
+      };
+      contentDetails?: {
+        duration?: string;
+      };
+    }>;
+  };
+
+  const item = Array.isArray(data.items) ? data.items[0] : undefined;
+  const title = (item?.snippet?.title ?? "").trim();
+  const description = (item?.snippet?.description ?? "").trim();
+
+  const thumbs = item?.snippet?.thumbnails ?? {};
+  const image =
+    thumbs.maxres?.url ?? thumbs.standard?.url ?? thumbs.high?.url ?? thumbs.medium?.url ?? thumbs.default?.url ?? null;
+
+  const durationMinutes = parseIso8601DurationMinutes(item?.contentDetails?.duration) ?? null;
+  const channelTitle = (item?.snippet?.channelTitle ?? "").trim();
+
+  if (!title) return null;
+
+  return {
+    title,
+    description: description ? description : null,
+    image,
+    durationMinutes,
+    channelTitle: channelTitle ? channelTitle : null,
+  };
+}
+
 function guessModalityFromUrl(url: URL): Modality {
   const host = url.hostname.toLowerCase();
   const path = url.pathname.toLowerCase();
@@ -329,6 +386,31 @@ export async function POST(req: Request) {
           ? parsed.pathname.split("/").filter(Boolean)[0]
           : parsed.searchParams.get("v")
         : null;
+
+    if (youtubeId) {
+      const apiKey = (process.env.YOUTUBE_API_KEY ?? "").trim();
+      if (apiKey) {
+        try {
+          const yt = await fetchYouTubeDataApi(youtubeId, apiKey);
+          if (yt) {
+            const youtubeFallbackImage = `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
+            return NextResponse.json<ResolvedLink>({
+              url: input,
+              canonicalUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}`,
+              title: yt.title,
+              description: yt.description ?? undefined,
+              image: yt.image ?? youtubeFallbackImage,
+              source: "YouTube",
+              modality: "video",
+              provider: "youtube",
+              durationMinutes: yt.durationMinutes ?? undefined,
+            });
+          }
+        } catch {
+          // Fall back to non-API resolver
+        }
+      }
+    }
 
     const html = youtubeId ? await fetchYouTubeHtml(input, youtubeId) : await fetchHtml(input);
     if (!html) {
