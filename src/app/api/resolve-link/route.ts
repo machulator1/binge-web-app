@@ -91,13 +91,17 @@ function isGenericYouTubeTitle(value: string) {
   const v = value.trim();
   if (!v) return true;
   if (/^youtube$/i.test(v)) return true;
+  if (/\byoutube\b/i.test(v) && /\s-\sYouTube$/i.test(v)) return true;
+  if (/^watch\s+on\s+youtube$/i.test(v)) return true;
   return false;
 }
 
 function isGenericYouTubeDescription(value: string) {
   const v = value.trim();
   if (!v) return true;
-  if (/^enjoy the videos and music you love/i.test(v)) return true;
+  if (/enjoy the videos and music you love/i.test(v)) return true;
+  if (/youtube is a/i.test(v) && /video/i.test(v)) return true;
+  if (/watch videos/i.test(v) && /youtube/i.test(v)) return true;
   return false;
 }
 
@@ -305,7 +309,8 @@ export async function POST(req: Request) {
 
     const ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
 
-    const ogOrDocTitle = extractTitle(html) ?? "";
+    const ogOrDocTitleRaw = extractTitle(html) ?? "";
+    const ogOrDocTitle = ogOrDocTitleRaw.replace(/\s-\sYouTube$/i, "").trim();
     const title =
       youtubeId && isGenericYouTubeTitle(ogOrDocTitle)
         ? (ytDetails?.title ?? "")

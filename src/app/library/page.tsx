@@ -101,6 +101,9 @@ function isPlaceholderDescription(raw?: string) {
   if (/^A short\b/i.test(v)) return true;
   if (/^A focused\b/i.test(v)) return true;
   if (/^A clean\b/i.test(v)) return true;
+  if (/enjoy the videos and music you love/i.test(v)) return true;
+  if (/youtube is a/i.test(v) && /video/i.test(v)) return true;
+  if (/watch videos/i.test(v) && /youtube/i.test(v)) return true;
   return false;
 }
 
