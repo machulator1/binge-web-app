@@ -736,8 +736,8 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh overflow-x-hidden">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+    <div className="min-h-dvh overflow-x-hidden bg-slate-900">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-900/80 backdrop-blur">
         <div className="mx-auto w-full max-w-lg px-5 py-3">
           <div className="flex items-center justify-between">
             <div className="text-[15px] font-semibold tracking-[-0.04em] text-foreground/90">BINGE</div>
@@ -835,7 +835,7 @@ export default function Home() {
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
                   placeholder="What do you want to watch, read, or listen to?"
-                    className="h-[56px] w-full rounded-[28px] border border-white/20 bg-slate-900/75 px-6 pr-16 text-[15px] font-medium text-white shadow-[0_18px_70px_rgba(0,0,0,0.55)] ring-1 ring-white/10 outline-none placeholder:text-foreground/35 focus:border-white/28 focus:bg-slate-900/80 focus:ring-white/18"
+                    className="h-[56px] w-full rounded-[28px] border border-white/22 bg-slate-800/80 px-6 pr-16 text-[15px] font-medium text-white shadow-[0_18px_70px_rgba(0,0,0,0.45)] ring-1 ring-blue-200/18 outline-none placeholder:text-foreground/35 focus:border-blue-200/30 focus:bg-slate-800/90 focus:ring-blue-200/28"
                     enterKeyHint="search"
                   />
                   <button
@@ -890,9 +890,9 @@ export default function Home() {
               <Link
                 href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
                 onClick={() => openTodaysRecommendationInApp({ navigate: false })}
-                className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/10 bg-slate-800/95 p-[14px] text-left shadow-[0_22px_82px_rgba(0,0,0,0.52)] transition duration-200 active:scale-[0.99] active:shadow-[0_20px_74px_rgba(0,0,0,0.66)]"
+                className="group relative mx-2 overflow-hidden rounded-[28px] border border-white/12 bg-slate-950/55 p-[14px] text-left shadow-[0_22px_82px_rgba(0,0,0,0.48)] transition duration-200 active:scale-[0.99] active:shadow-[0_20px_74px_rgba(0,0,0,0.62)]"
               >
-                <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.08),transparent_60%)] opacity-35" />
+                <div className="pointer-events-none absolute -inset-10 bg-[radial-gradient(520px_circle_at_28%_18%,rgba(99,102,241,0.10),transparent_62%)] opacity-45" />
 
                 <div className="px-1">
                   {todaysRecommendationTitle ? (
@@ -942,7 +942,7 @@ export default function Home() {
                           e.preventDefault();
                           openTodaysRecommendationInApp();
                         }}
-                        className="inline-flex h-11 min-w-24 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 group-active:bg-blue-500"
+                        className="inline-flex h-11 min-w-24 items-center justify-center rounded-2xl bg-blue-500 px-5 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.30)] ring-1 ring-blue-200/30 transition duration-200 hover:bg-blue-500/95 active:bg-blue-400"
                       >
                         Open
                       </button>
@@ -952,7 +952,7 @@ export default function Home() {
                           e.preventDefault();
                           void shareRecommendation();
                         }}
-                        className="inline-flex h-11 min-w-24 items-center justify-center rounded-2xl border border-white/14 bg-white/10 px-5 text-sm font-semibold text-foreground/85 transition duration-200 hover:bg-white/14 active:bg-white/16"
+                        className="inline-flex h-11 min-w-24 items-center justify-center rounded-2xl border border-white/20 bg-white/12 px-5 text-sm font-semibold text-foreground/90 shadow-[0_12px_45px_rgba(0,0,0,0.18)] transition duration-200 hover:bg-white/16 active:bg-white/18"
                       >
                         Share
                       </button>
@@ -961,7 +961,7 @@ export default function Home() {
                 </div>
               </Link>
             ) : (
-              <div className="mx-2 rounded-[28px] border border-white/10 bg-slate-800/60 px-5 py-6 text-left shadow-[0_18px_70px_rgba(0,0,0,0.40)]">
+              <div className="mx-2 rounded-[28px] border border-white/12 bg-slate-950/45 px-5 py-6 text-left shadow-[0_18px_70px_rgba(0,0,0,0.32)]">
                 <div className="text-sm font-semibold text-foreground/80">Save something to get started</div>
                 <div className="mt-2 text-sm leading-6 text-foreground/55">
                   Your latest saved item will show up here.
@@ -971,7 +971,7 @@ export default function Home() {
 
             <Link
               href="/library"
-              className="relative overflow-hidden rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_16px_60px_rgba(0,0,0,0.45)] transition duration-200 hover:bg-white/8 active:scale-[0.995]"
+              className="relative overflow-hidden rounded-[22px] border border-white/12 bg-white/6 px-4 py-4 shadow-[0_16px_60px_rgba(0,0,0,0.40)] transition duration-200 hover:bg-white/10 active:scale-[0.995]"
             >
               <div className="relative flex items-center justify-center">
                 <div className="text-base font-semibold leading-7 text-foreground/85">My Library</div>
