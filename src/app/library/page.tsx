@@ -141,7 +141,7 @@ function Row({
               </div>
 
               <div className="bg-slate-800/70 p-3">
-                <div className="line-clamp-2 text-sm font-semibold leading-6 text-foreground">
+                <div className="truncate text-sm font-semibold leading-6 text-foreground">
                   {item.title}
                 </div>
 

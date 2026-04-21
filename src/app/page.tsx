@@ -896,7 +896,7 @@ export default function Home() {
 
                 <div className="px-1">
                   {todaysRecommendationTitle ? (
-                    <div className="text-[17px] font-semibold leading-7 text-foreground">
+                    <div className="truncate text-[17px] font-semibold leading-7 text-foreground">
                       {todaysRecommendationTitle}
                     </div>
                   ) : null}
