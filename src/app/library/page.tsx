@@ -237,14 +237,14 @@ function Row({
                           <path
                             d="M9 3h6m-8 4h10m-9 0 1 14h6l1-14"
                             stroke="currentColor"
-                            strokeWidth="2.2"
+                            strokeWidth="2.4"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
                           <path
                             d="M10 11v6M14 11v6"
                             stroke="currentColor"
-                            strokeWidth="2.2"
+                            strokeWidth="2.4"
                             strokeLinecap="round"
                           />
                         </svg>

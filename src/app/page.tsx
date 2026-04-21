@@ -839,7 +839,7 @@ export default function Home() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onPaste={onPaste}
-                  placeholder="What do you want to watch, read, or listen to?"
+                  placeholder="Search your library"
                     className="h-[56px] w-full rounded-[28px] border border-white/28 bg-white/8 px-6 pr-16 text-[15px] font-medium text-white shadow-[0_18px_70px_rgba(0,0,0,0.40)] ring-1 ring-blue-200/16 outline-none placeholder:text-foreground/35 focus:border-blue-200/34 focus:bg-white/10 focus:ring-blue-200/26"
                     enterKeyHint="search"
                   />
