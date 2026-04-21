@@ -736,7 +736,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-background">
+    <div className="min-h-dvh overflow-x-hidden">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-lg px-5 py-3">
           <div className="flex items-center justify-between">
@@ -880,12 +880,6 @@ export default function Home() {
           </section>
 
           <section className="mt-8 grid gap-4">
-            <div className="px-1 text-center">
-              <div className="text-[13px] font-medium tracking-tight text-foreground/50">
-                Best for your time right now
-              </div>
-            </div>
-
             {todaysRecommendation ? (
               <Link
                 href={`/content/${encodeURIComponent(todaysRecommendation.id)}`}
