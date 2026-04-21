@@ -145,6 +145,12 @@ function Row({
                   {item.title}
                 </div>
 
+                {item.description ? (
+                  <div className="mt-1 line-clamp-1 text-xs font-medium leading-5 text-foreground/55">
+                    {item.description}
+                  </div>
+                ) : null}
+
                 <div className="mt-4 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span
@@ -233,7 +239,7 @@ function Row({
                         className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-foreground/80 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/12 active:scale-[0.98] active:bg-white/12 active:text-foreground"
                         aria-label="Delete"
                       >
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-[26px]">
                           <path
                             d="M9 3h6m-8 4h10m-9 0 1 14h6l1-14"
                             stroke="currentColor"
