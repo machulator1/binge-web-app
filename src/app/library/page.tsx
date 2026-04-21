@@ -176,27 +176,27 @@ function Row({
                     <button
                       type="button"
                       onClick={() => onShare(item)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-foreground/70 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/10 active:bg-white/12 active:text-foreground/90"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-foreground/80 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/12 active:scale-[0.98] active:bg-white/12 active:text-foreground"
                       aria-label="Share"
                     >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
                         <path
                           d="M12 3v10"
                           stroke="currentColor"
-                          strokeWidth="1.8"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                         />
                         <path
                           d="M8 6.5 12 3l4 3.5"
                           stroke="currentColor"
-                          strokeWidth="1.8"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
                         <path
                           d="M7 10h-.2A2.8 2.8 0 0 0 4 12.8V18a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5.2A2.8 2.8 0 0 0 17.2 10H17"
                           stroke="currentColor"
-                          strokeWidth="1.8"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                         />
                       </svg>
@@ -206,20 +206,20 @@ function Row({
                       <button
                         type="button"
                         onClick={() => onSend(item)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-foreground/70 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/10 active:bg-white/12 active:text-foreground/90"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-foreground/80 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/12 active:scale-[0.98] active:bg-white/12 active:text-foreground"
                         aria-label="Send to friend"
                       >
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
                           <path
                             d="M3.5 11.5 21 3.5l-8 17-2.5-7L3.5 11.5Z"
                             stroke="currentColor"
-                            strokeWidth="1.8"
+                            strokeWidth="2.2"
                             strokeLinejoin="round"
                           />
                           <path
                             d="M10.5 13.5 21 3.5"
                             stroke="currentColor"
-                            strokeWidth="1.8"
+                            strokeWidth="2.2"
                             strokeLinecap="round"
                           />
                         </svg>
@@ -230,21 +230,21 @@ function Row({
                       <button
                         type="button"
                         onClick={() => onDelete(item)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-foreground/70 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/10 active:bg-white/12 active:text-foreground/90"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-foreground/80 transition duration-200 hover:bg-white/10 hover:ring-1 hover:ring-white/12 active:scale-[0.98] active:bg-white/12 active:text-foreground"
                         aria-label="Delete"
                       >
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6">
                           <path
                             d="M9 3h6m-8 4h10m-9 0 1 14h6l1-14"
                             stroke="currentColor"
-                            strokeWidth="1.8"
+                            strokeWidth="2.2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
                           <path
                             d="M10 11v6M14 11v6"
                             stroke="currentColor"
-                            strokeWidth="1.8"
+                            strokeWidth="2.2"
                             strokeLinecap="round"
                           />
                         </svg>
