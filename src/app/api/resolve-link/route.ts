@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type Modality = "article" | "video" | "podcast";
 
 type ResolvedLink = {
@@ -144,6 +147,41 @@ function extractYouTubeVideoDetails(html: string) {
     title: title ? title : null,
     description: description ? description : null,
   };
+}
+
+async function fetchHtml(url: string, extraHeaders?: Record<string, string>) {
+  const res = await fetch(url, {
+    redirect: "follow",
+    cache: "no-store",
+    headers: {
+      "user-agent": "binge/0.1 (metadata resolver)",
+      accept: "text/html,application/xhtml+xml",
+      "accept-language": "en-US,en;q=0.9",
+      ...(extraHeaders ?? {}),
+    },
+  });
+
+  if (!res.ok) return null;
+  return await res.text();
+}
+
+async function fetchYouTubeHtml(inputUrl: string, youtubeId: string) {
+  const consentCookie = {
+    cookie: "CONSENT=YES+1;",
+  };
+
+  const primary = await fetchHtml(inputUrl, consentCookie);
+  if (primary) return primary;
+
+  const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}&hl=en&gl=US`;
+  const watch = await fetchHtml(watchUrl, consentCookie);
+  if (watch) return watch;
+
+  const embedUrl = `https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?hl=en`;
+  const embed = await fetchHtml(embedUrl, consentCookie);
+  if (embed) return embed;
+
+  return null;
 }
 
 function extractOgTag(html: string, property: string) {
@@ -292,22 +330,12 @@ export async function POST(req: Request) {
           : parsed.searchParams.get("v")
         : null;
 
-    const res = await fetch(input, {
-      redirect: "follow",
-      headers: {
-        "user-agent": "binge/0.1 (metadata resolver)",
-        accept: "text/html,application/xhtml+xml",
-        "accept-language": "en-US,en;q=0.9",
-      },
-    });
-
-    if (!res.ok) {
+    const html = youtubeId ? await fetchYouTubeHtml(input, youtubeId) : await fetchHtml(input);
+    if (!html) {
       return NextResponse.json({ error: "Fetch failed" }, { status: 502 });
     }
 
-    const html = await res.text();
-
-    const ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
+    let ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
 
     const ogOrDocTitleRaw = extractTitle(html) ?? "";
     const ogOrDocTitle = ogOrDocTitleRaw.replace(/\s-\sYouTube$/i, "").trim();
@@ -317,14 +345,29 @@ export async function POST(req: Request) {
         : ogOrDocTitle;
 
     const ogOrMetaDescription = extractDescription(html) ?? null;
+
+    const ogLooksGeneric = youtubeId && ogOrMetaDescription ? isGenericYouTubeDescription(ogOrMetaDescription) : false;
+    const titleLooksGeneric = youtubeId ? isGenericYouTubeTitle(ogOrDocTitle) : false;
+
+    if (youtubeId && (titleLooksGeneric || ogLooksGeneric) && !ytDetails) {
+      const retryUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}&hl=en&gl=US`;
+      const retryHtml = await fetchYouTubeHtml(retryUrl, youtubeId);
+      if (retryHtml) {
+        ytDetails = extractYouTubeVideoDetails(retryHtml);
+      }
+    }
+
     const descriptionFromYouTube = youtubeId
       ? (ytDetails?.description ?? extractYouTubeShortDescription(html))
       : null;
+
     const description = youtubeId
-      ? (ogOrMetaDescription && !isGenericYouTubeDescription(ogOrMetaDescription)
+      ? (ogOrMetaDescription && !ogLooksGeneric
           ? ogOrMetaDescription
           : descriptionFromYouTube ?? undefined)
       : (ogOrMetaDescription ?? undefined);
+
+    const safeDescription = youtubeId && description ? (isGenericYouTubeDescription(description) ? undefined : description) : description;
     const canon = canonicalUrl(html) ?? undefined;
     const baseForImages = canon ?? input;
     const ogImageRaw = extractImage(html);
@@ -340,7 +383,7 @@ export async function POST(req: Request) {
       url: input,
       canonicalUrl: canon,
       title,
-      description,
+      description: safeDescription,
       image,
       source,
       modality,
