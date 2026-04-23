@@ -17,6 +17,32 @@ type ResolvedLink = {
   canonicalUrl?: string;
 };
 
+function extractYouTubeId(url: URL) {
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname;
+
+  const isYouTubeHost =
+    host.includes("youtube.com") || host.includes("youtu.be") || host.includes("youtube-nocookie.com");
+  if (!isYouTubeHost) return null;
+
+  if (host.includes("youtu.be")) {
+    const id = path.split("/").filter(Boolean)[0] ?? "";
+    return id.trim() ? id.trim() : null;
+  }
+
+  const v = (url.searchParams.get("v") ?? "").trim();
+  if (v) return v;
+
+  const parts = path.split("/").filter(Boolean);
+  const markerIdx = parts.findIndex((p) => ["shorts", "embed", "live"].includes(p.toLowerCase()));
+  if (markerIdx >= 0) {
+    const id = parts[markerIdx + 1] ?? "";
+    return id.trim() ? id.trim() : null;
+  }
+
+  return null;
+}
+
 function parseIso8601DurationMinutes(value: string | null | undefined) {
   const raw = (value ?? "").trim();
   if (!raw) return null;
@@ -380,12 +406,7 @@ export async function POST(req: Request) {
     const modality = guessModalityFromUrl(parsed);
     const source = hostLabel(parsed.hostname);
 
-    const youtubeId =
-      modality === "video"
-        ? parsed.hostname.toLowerCase().includes("youtu.be")
-          ? parsed.pathname.split("/").filter(Boolean)[0]
-          : parsed.searchParams.get("v")
-        : null;
+    const youtubeId = modality === "video" ? extractYouTubeId(parsed) : null;
 
     if (youtubeId) {
       const apiKey = (process.env.YOUTUBE_API_KEY ?? "").trim();
