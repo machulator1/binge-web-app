@@ -17,6 +17,15 @@ type Body = {
   message?: string;
 };
 
+function normalizeHandle(value: string) {
+  return value
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 24);
+}
+
 export async function POST(req: Request) {
   const token = getBearerToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,7 +37,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const toHandle = (body.toHandle ?? "").trim().replace(/^@/, "");
+  const toHandle = normalizeHandle(body.toHandle ?? "");
   const url = (body.url ?? "").trim();
 
   if (!toHandle) return NextResponse.json({ error: "Missing toHandle" }, { status: 400 });
@@ -45,11 +54,11 @@ export async function POST(req: Request) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("id, handle")
-      .ilike("handle", toHandle)
+      .eq("handle", toHandle)
       .maybeSingle();
 
     if (profileError) {
-      return NextResponse.json({ error: "Failed to resolve handle" }, { status: 500 });
+      return NextResponse.json({ error: profileError.message || "Failed to resolve handle" }, { status: 500 });
     }
 
     if (!profile?.id) {
@@ -72,7 +81,7 @@ export async function POST(req: Request) {
 
     const { error: insertError } = await supabase.from("shares").insert(payload);
     if (insertError) {
-      return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+      return NextResponse.json({ error: insertError.message || "Failed to send" }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
