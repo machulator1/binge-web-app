@@ -104,6 +104,39 @@ function normalizeUrl(value: string) {
   return `https://${v}`;
 }
 
+function normalizeSpokenUrl(value: string) {
+  const raw = value.trim();
+  if (!raw) return "";
+
+  let v = raw
+    .replace(/\s+(\.|\/|\?|&|=|#|:|-)\s+/g, "$1")
+    .replace(/\s+/g, " ")
+    .replace(/\s*dot\s*/gi, ".")
+    .replace(/\s*slash\s*/gi, "/")
+    .replace(/\s*question\s*mark\s*/gi, "?")
+    .replace(/\s*ampersand\s*/gi, "&")
+    .replace(/\s*equals\s*/gi, "=")
+    .replace(/\s*colon\s*/gi, ":")
+    .replace(/\s*hyphen\s*/gi, "-")
+    .replace(/\s+/g, "")
+    .replace(/^https?\/\//i, (m) => m.toLowerCase());
+
+  if (!v) return "";
+
+  if (!/^https?:\/\//i.test(v) && /^[\w-]+\.[\w.-]+/i.test(v)) {
+    v = `https://${v}`;
+  }
+
+  try {
+    const u = new URL(v);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    // Ignore
+  }
+
+  return "";
+}
+
 function hostLabel(hostname: string) {
   const parts = hostname.split(".").filter(Boolean);
   const core = parts.length >= 2 ? parts[parts.length - 2] : hostname;
@@ -245,7 +278,9 @@ export default function Home() {
       const e = event as { results?: ArrayLike<ArrayLike<{ transcript?: string }>> };
       const result = e.results?.[0]?.[0]?.transcript ?? "";
       const text = result.trim();
-      if (text) setQuery(text);
+      if (!text) return;
+      const normalizedUrl = normalizeSpokenUrl(text);
+      setQuery(normalizedUrl || text);
     };
 
     recognition.onend = () => {
