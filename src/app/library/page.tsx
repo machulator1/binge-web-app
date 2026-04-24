@@ -19,6 +19,7 @@ type QueueItem = {
   durationMinutes: number;
   source: string;
   savedBy: string;
+  sharedBy?: string;
   status: ItemStatus;
   dateSaved: string; // YYYY-MM-DD
   thumbnailUrl?: string;
@@ -38,6 +39,7 @@ type ShareRow = {
   thumbnail_url: string | null;
   source: string | null;
   opened_at: string | null;
+  fromHandle?: string | null;
 };
 
 type BriefStory = {
@@ -129,6 +131,66 @@ function thumbDataUri(modality: Modality) {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+function domainThumbDataUri({ hostname, modality }: { hostname: string; modality: Modality }) {
+  const safeHost = hostname.replace(/^www\./i, "");
+  const label = modality === "video" ? "Video" : modality === "podcast" ? "Podcast" : "Article";
+  const seed = Array.from(safeHost).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const hue = seed % 360;
+  const hue2 = (hue + 36) % 360;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="hsl(${hue} 70% 20%)"/>
+          <stop offset="0.65" stop-color="hsl(${hue2} 70% 26%)"/>
+          <stop offset="1" stop-color="#0a0a0a"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="675" rx="90" fill="url(#g)"/>
+      <rect x="70" y="70" width="1060" height="535" rx="66" fill="rgba(255,255,255,0.06)"/>
+      <text x="120" y="170" font-family="ui-sans-serif, system-ui, -apple-system" font-size="44" font-weight="700" fill="rgba(255,255,255,0.92)">${label}</text>
+      <text x="120" y="240" font-family="ui-sans-serif, system-ui, -apple-system" font-size="34" font-weight="600" fill="rgba(255,255,255,0.72)">${safeHost}</text>
+    </svg>
+  `.trim();
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function fallbackThumbForItem(item: QueueItem) {
+  if (item.url) {
+    try {
+      const u = new URL(item.url);
+      return domainThumbDataUri({ hostname: u.hostname, modality: item.modality });
+    } catch {
+      // Ignore
+    }
+  }
+  return thumbDataUri(item.modality);
+}
+
+function CardThumb({
+  item,
+  size,
+}: {
+  item: QueueItem;
+  size: "featured" | "default";
+}) {
+  const [failed, setFailed] = useState(false);
+  const fallback = fallbackThumbForItem(item);
+  const src = !failed && item.thumbnailUrl ? item.thumbnailUrl : fallback;
+
+  return (
+    <Image
+      src={src}
+      alt="Thumbnail"
+      fill
+      sizes={size === "featured" ? "288px" : "224px"}
+      className="object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function Row({
   title,
   items,
@@ -165,13 +227,7 @@ function Row({
               className={`${cardWidth} snap-start shrink-0 overflow-hidden rounded-[22px] border border-white/12 bg-slate-800/95 shadow-[0_18px_28px_-22px_rgba(0,0,0,0.75)] transition duration-200 active:scale-[0.99]`}
             >
               <div className={`relative ${thumbHeight} w-full overflow-hidden bg-black/20`}>
-                <Image
-                  src={item.thumbnailUrl ?? thumbDataUri(item.modality)}
-                  alt="Thumbnail"
-                  fill
-                  sizes={size === "featured" ? "288px" : "224px"}
-                  className="object-cover"
-                />
+                <CardThumb item={item} size={size} />
               </div>
 
               <div className="bg-slate-800/70 p-3">
@@ -195,6 +251,11 @@ function Row({
                     <span className="inline-flex h-4 items-center justify-center rounded-full bg-white/5 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
                       {item.durationMinutes} min
                     </span>
+                    {item.sharedBy ? (
+                      <span className="truncate text-[11px] font-semibold text-white/60">
+                        Shared by {item.sharedBy}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -641,17 +702,18 @@ export default function LibraryPage() {
           return;
         }
 
-        const data = (await res.json()) as { shares?: ShareRow[] };
-        const shares = Array.isArray(data.shares) ? data.shares : [];
-        const mapped: QueueItem[] = shares.map((s) => ({
-          id: `share_${s.id}`,
-          title: s.title ?? s.url,
+        const json = (await res.json()) as { shares?: ShareRow[] };
+        const shares = Array.isArray(json.shares) ? (json.shares as ShareRow[]) : [];
+        const mapped = shares.map((s) => ({
+          id: s.id,
+          title: s.title ?? "Shared link",
           url: s.url,
-          modality: "article",
+          modality: "article" as const,
           durationMinutes: 5,
           source: s.source ?? "Shared",
           savedBy: "Friend",
-          status: "saved",
+          sharedBy: s.fromHandle ? `@${s.fromHandle}` : "a friend",
+          status: "saved" as const,
           dateSaved: (s.created_at ?? new Date().toISOString()).slice(0, 10),
           thumbnailUrl: s.thumbnail_url ?? undefined,
           description: s.summary ?? undefined,
@@ -810,6 +872,19 @@ export default function LibraryPage() {
     }
   }
 
+  function deleteSharedInboxItem(item: QueueItem) {
+    if (!sessionToken) return;
+    if (!confirm("Remove this shared item?")) return;
+    setShareInboxItems((prev) => prev.filter((it) => it.id !== item.id));
+
+    void fetch(`/api/shares/inbox?id=${encodeURIComponent(item.id)}`, {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    });
+  }
+
   return (
     <div className="min-h-dvh overflow-x-hidden">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
@@ -833,7 +908,15 @@ export default function LibraryPage() {
         <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
-        <Row title="Shared by friends" items={shareInboxItems} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} />
+        <Row
+          title="Shared by friends"
+          items={shareInboxItems}
+          size="default"
+          onOpen={openInApp}
+          onShare={shareItem}
+          onSend={sessionToken ? sendToFriend : undefined}
+          onDelete={deleteSharedInboxItem}
+        />
         <Row
           title="Daily AI Brief"
           items={dailyBriefItems}

@@ -320,16 +320,83 @@ function isLikelyImageUrl(value: string) {
 }
 
 function extractFirstImage(html: string, baseUrl: string) {
-  const imgRe = /<img\b[^>]*?\bsrc=["']([^"']+)["'][^>]*>/gi;
+  const imgRe = /<img\b[^>]*>/gi;
   let match: RegExpExecArray | null;
   while ((match = imgRe.exec(html))) {
-    const src = match[1] ?? "";
-    const resolved = resolveUrl(src, baseUrl);
-    if (!resolved) continue;
-    if (!isLikelyImageUrl(resolved)) continue;
-    return resolved;
+    const tag = match[0] ?? "";
+    const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
+    const dataSrcMatch = tag.match(/\bdata-(?:lazy-)?src=["']([^"']+)["']/i);
+    const srcSetMatch = tag.match(/\bsrcset=["']([^"']+)["']/i);
+
+    const candidates: string[] = [];
+    if (srcMatch?.[1]) candidates.push(srcMatch[1]);
+    if (dataSrcMatch?.[1]) candidates.push(dataSrcMatch[1]);
+
+    if (srcSetMatch?.[1]) {
+      const first = srcSetMatch[1]
+        .split(",")
+        .map((part) => part.trim().split(/\s+/)[0])
+        .filter(Boolean)[0];
+      if (first) candidates.push(first);
+    }
+
+    for (const c of candidates) {
+      const resolved = resolveUrl(c, baseUrl);
+      if (!resolved) continue;
+      if (!isLikelyImageUrl(resolved)) continue;
+      return resolved;
+    }
   }
   return null;
+}
+
+function extractJsonLdImages(html: string) {
+  const scripts = html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi);
+  if (!scripts || scripts.length === 0) return [];
+
+  const out: string[] = [];
+  for (const block of scripts) {
+    const content = block
+      .replace(/^[\s\S]*?>/i, "")
+      .replace(/<\/script>\s*$/i, "")
+      .trim();
+    if (!content) continue;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content) as unknown;
+    } catch {
+      continue;
+    }
+
+    const stack: unknown[] = [parsed];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur) continue;
+
+      if (Array.isArray(cur)) {
+        for (const v of cur) stack.push(v);
+        continue;
+      }
+
+      if (typeof cur !== "object") continue;
+      const obj = cur as Record<string, unknown>;
+
+      const image = obj.image;
+      if (typeof image === "string") out.push(image);
+      if (Array.isArray(image)) {
+        for (const v of image) if (typeof v === "string") out.push(v);
+      }
+      if (image && typeof image === "object") {
+        const maybeUrl = (image as Record<string, unknown>).url;
+        if (typeof maybeUrl === "string") out.push(maybeUrl);
+      }
+
+      for (const v of Object.values(obj)) stack.push(v);
+    }
+  }
+
+  return out;
 }
 
 function domainThumbSvg({ hostname, modality }: { hostname: string; modality: Modality }) {
@@ -478,9 +545,19 @@ export async function POST(req: Request) {
     const imageFromOg = ogImage && isLikelyImageUrl(ogImage) ? ogImage : null;
     const imageFromPage = imageFromOg ? null : extractFirstImage(html, baseForImages);
 
+    const jsonLdCandidates = imageFromOg || imageFromPage ? [] : extractJsonLdImages(html);
+    const imageFromJsonLd =
+      jsonLdCandidates
+        .map((c) => resolveUrl(c, baseForImages))
+        .find((c): c is string => Boolean(c && isLikelyImageUrl(c))) ?? null;
+
     const youtubeFallbackImage = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : null;
     const image =
-      imageFromOg ?? imageFromPage ?? youtubeFallbackImage ?? domainThumbSvg({ hostname: parsed.hostname, modality });
+      imageFromOg ??
+      imageFromPage ??
+      imageFromJsonLd ??
+      youtubeFallbackImage ??
+      domainThumbSvg({ hostname: parsed.hostname, modality });
 
     return NextResponse.json<ResolvedLink>({
       url: input,
