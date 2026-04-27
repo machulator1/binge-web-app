@@ -7,6 +7,8 @@ import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { SendToFriendSheet } from "@/components/SendToFriendSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { looksLikeUrl } from "@/lib/urlImport";
+import { useSaveToBingeFlow } from "@/lib/useSaveToBingeFlow";
 
 type Modality = "article" | "video" | "podcast";
 type ItemStatus = "saved" | "in_progress" | "consumed";
@@ -454,6 +456,18 @@ export default function LibraryPage() {
   const [dailyBriefItems, setDailyBriefItems] = useState<QueueItem[]>([]);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [importUrl, setImportUrl] = useState("");
+
+  const {
+    saveUrl,
+    saveDraft,
+    setSaveDraft,
+    saveFeedback,
+    resolveStatus,
+    openFromUrl,
+    closeSaveFlow,
+    saveToLibrary,
+  } = useSaveToBingeFlow({ sessionToken });
 
   useEffect(() => {
     function load() {
@@ -815,6 +829,56 @@ export default function LibraryPage() {
     });
   }
 
+  function onImportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = importUrl.trim();
+    if (!q) return;
+    if (!looksLikeUrl(q)) return;
+    setImportUrl("");
+    openFromUrl(q);
+  }
+
+  function onImportPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (!looksLikeUrl(pasted)) return;
+    e.preventDefault();
+    setImportUrl("");
+    openFromUrl(pasted);
+  }
+
+  async function saveToLibraryAndRefresh() {
+    const result = await saveToLibrary();
+    const localItem = result.localItem as
+      | {
+          id: string;
+          title: string;
+          url: string;
+          modality: Modality;
+          durationMinutes: number;
+          source: string;
+          savedBy: string;
+          status: ItemStatus;
+          dateSaved: string;
+          thumbnailUrl?: string;
+          description?: string;
+          notes?: string;
+        }
+      | null;
+
+    if (localItem) {
+      setItems((prev) => {
+        const storage = sessionToken ? ("server" as const) : ("local" as const);
+        const nextItem: QueueItem = { ...localItem, storage };
+        const next = [nextItem, ...prev.filter((it) => it.url !== nextItem.url)];
+        return next;
+      });
+    }
+
+    window.setTimeout(() => {
+      closeSaveFlow();
+    }, 1200);
+  }
+
   function sendToFriend(item: QueueItem) {
     if (!sessionToken) return;
     const url = item.url ?? "";
@@ -887,7 +951,7 @@ export default function LibraryPage() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-white/10 bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-lg px-5 py-3">
           <div className="flex items-center justify-between">
             <div>
@@ -904,7 +968,22 @@ export default function LibraryPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg pb-10">
+      <main className="mx-auto w-full max-w-lg pb-10 pt-[60px]">
+        <section className="px-5 pt-4">
+          <form onSubmit={onImportSubmit}>
+            <div className="relative">
+              <input
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onPaste={onImportPaste}
+                placeholder="Paste URL to add"
+                className="h-11 w-full rounded-2xl border border-white/12 bg-white/5 px-4 text-sm font-semibold text-foreground/85 shadow-[0_14px_55px_rgba(0,0,0,0.22)] outline-none placeholder:text-foreground/35 focus:border-white/18"
+                enterKeyHint="done"
+              />
+            </div>
+          </form>
+        </section>
+
         <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
         <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
@@ -928,6 +1007,190 @@ export default function LibraryPage() {
         />
         <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
       </main>
+
+      {saveDraft ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={closeSaveFlow}
+            className="absolute inset-0 bg-black/70"
+          />
+
+          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-lg px-4 pb-5">
+            <div className="relative overflow-hidden rounded-[28px] border border-white/12 bg-slate-900 shadow-[0_30px_120px_rgba(0,0,0,0.75)]">
+              <div className="flex items-center justify-between px-5 pb-3 pt-5">
+                <div>
+                  <div className="text-sm font-semibold tracking-wide text-foreground/70">Save to Binge</div>
+                  <div className="mt-1 text-xs font-medium text-foreground/45">{saveUrl}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeSaveFlow}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-foreground/70"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                    <path
+                      d="M6 6l12 12M18 6 6 18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-5 pb-5">
+                <div className="overflow-hidden rounded-2xl ring-1 ring-white/10">
+                  <div className="relative h-44 w-full">
+                    <Image
+                      src={saveDraft.thumbnailUrl}
+                      alt="Saved content thumbnail"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 512px"
+                      className="object-cover"
+                      priority
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-lg font-semibold leading-7 text-foreground">{saveDraft.title}</div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
+                    <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
+                      {saveDraft.modality === "video"
+                        ? "Video"
+                        : saveDraft.modality === "podcast"
+                          ? "Podcast"
+                          : "Article"}
+                    </span>
+                    <span className="text-foreground/35">•</span>
+                    <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
+                      {saveDraft.durationMinutes} min
+                    </span>
+                    <span className="text-foreground/35">•</span>
+                    <span className="truncate">{saveDraft.source}</span>
+                  </div>
+
+                  {resolveStatus === "loading" ? (
+                    <div className="mt-2 text-xs font-semibold text-foreground/40">Fetching details…</div>
+                  ) : resolveStatus === "failed" ? (
+                    <div className="mt-2 text-xs font-semibold text-foreground/40">
+                      Couldn’t fetch details — saving with a quick preview.
+                    </div>
+                  ) : null}
+
+                  {saveDraft.description ? (
+                    <div className="mt-2 line-clamp-1 text-sm font-medium text-foreground/55">
+                      {saveDraft.description}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-[11px] font-semibold tracking-wide text-foreground/45">Duration (minutes)</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        value={saveDraft.durationMinutes}
+                        onChange={(e) =>
+                          setSaveDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  durationMinutes: Math.max(1, Number(e.target.value) || 1),
+                                }
+                              : prev,
+                          )
+                        }
+                        className="h-10 w-28 rounded-full border border-white/10 bg-black/10 px-3 text-sm font-semibold text-foreground outline-none focus:border-white/18"
+                        aria-label="Duration in minutes"
+                      />
+                      <div className="text-xs font-semibold text-foreground/40">min</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-[11px] font-semibold tracking-wide text-foreground/45">Shared by</div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSaveDraft((prev) => (prev ? { ...prev, savedBy: "Me" } : prev))}
+                        className={`inline-flex h-9 items-center justify-center rounded-full border px-3 text-sm font-semibold transition duration-200 ${
+                          saveDraft.savedBy.trim().toLowerCase() === "me"
+                            ? "border-white/18 bg-white/10 text-foreground"
+                            : "border-white/10 bg-white/5 text-foreground/75 hover:bg-white/10"
+                        }`}
+                      >
+                        Me
+                      </button>
+                      <div className="flex min-w-[160px] flex-1 items-center">
+                        <input
+                          value={saveDraft.savedBy}
+                          onChange={(e) =>
+                            setSaveDraft((prev) => (prev ? { ...prev, savedBy: e.target.value } : prev))
+                          }
+                          className="h-9 w-full rounded-full border border-white/10 bg-black/10 px-3 text-sm font-semibold text-foreground outline-none placeholder:text-foreground/35 focus:border-white/18"
+                          placeholder="Friend’s name"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="mt-3 block">
+                    <div className="sr-only">Notes</div>
+                    <input
+                      value={saveDraft.notes}
+                      onChange={(e) =>
+                        setSaveDraft((prev) => (prev ? { ...prev, notes: e.target.value } : prev))
+                      }
+                      className="h-11 w-full rounded-2xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-foreground/80 outline-none placeholder:text-foreground/35 focus:border-white/18"
+                      placeholder="Add a note (optional)"
+                    />
+                  </label>
+
+                  <div className="mt-5 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={saveToLibraryAndRefresh}
+                      disabled={saveFeedback === "saved"}
+                      className={`inline-flex h-12 flex-1 items-center justify-center rounded-2xl text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 active:scale-[0.99] disabled:opacity-90 ${
+                        saveFeedback === "saved"
+                          ? "bg-emerald-500/85 ring-emerald-300/30"
+                          : "bg-blue-500/90"
+                      }`}
+                    >
+                      {saveFeedback === "saved" ? "Saved" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeSaveFlow}
+                      disabled={saveFeedback === "saved"}
+                      className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/12 bg-white/5 text-sm font-semibold text-foreground/75 transition duration-200 hover:bg-white/10 active:bg-white/12 disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className={`pointer-events-none absolute inset-x-0 bottom-8 mx-auto w-full max-w-md px-4 transition duration-200 ${
+                    saveFeedback === "saved" ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+                  }`}
+                >
+                  <div className="rounded-2xl border border-white/12 bg-slate-900/95 px-4 py-3 text-center text-sm font-semibold text-foreground shadow-[0_22px_70px_rgba(0,0,0,0.65)]">
+                    Saved to your library
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ShareSheet open={Boolean(shareSheet)} data={shareSheet} onClose={() => setShareSheet(null)} />
       <SendToFriendSheet open={Boolean(sendSheet)} payload={sendSheet} onClose={() => setSendSheet(null)} />

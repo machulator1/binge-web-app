@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { looksLikeUrl } from "@/lib/urlImport";
 import { SendToFriendSheet } from "@/components/SendToFriendSheet";
+import { useSaveToBingeFlow } from "@/lib/useSaveToBingeFlow";
 
 type SpeechRecognitionAlternative = {
   continuous: boolean;
@@ -84,31 +86,10 @@ type ResolvedLink = {
   canonicalUrl?: string;
 };
 
-function looksLikeUrl(value: string) {
-  const v = value.trim();
-  if (!v) return false;
-
-  try {
-    const u = new URL(v);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    if (/^[\w-]+\.[\w.-]+(\/|$)/i.test(v)) return true;
-    return false;
-  }
-}
-
-function normalizeUrl(value: string) {
-  const v = value.trim();
-  if (!v) return "";
-  if (/^https?:\/\//i.test(v)) return v;
-  return `https://${v}`;
-}
-
 function normalizeSpokenUrl(value: string) {
   const raw = value.trim();
   if (!raw) return "";
-
-  let v = raw
+  const cleaned = raw
     .replace(/\s+(\.|\/|\?|&|=|#|:|-)\s+/g, "$1")
     .replace(/\s+/g, " ")
     .replace(/\s*dot\s*/gi, ".")
@@ -121,6 +102,7 @@ function normalizeSpokenUrl(value: string) {
     .replace(/\s+/g, "")
     .replace(/^https?\/\//i, (m) => m.toLowerCase());
 
+  let v = cleaned.trim();
   if (!v) return "";
 
   if (!/^https?:\/\//i.test(v) && /^[\w-]+\.[\w.-]+/i.test(v)) {
@@ -135,88 +117,6 @@ function normalizeSpokenUrl(value: string) {
   }
 
   return "";
-}
-
-function hostLabel(hostname: string) {
-  const parts = hostname.split(".").filter(Boolean);
-  const core = parts.length >= 2 ? parts[parts.length - 2] : hostname;
-  return core
-    .split(/[-_]/g)
-    .map((p) => (p ? p[0].toUpperCase() + p.slice(1) : p))
-    .join(" ");
-}
-
-function modalityFromUrl(url: URL): SavedModality {
-  const host = url.hostname.toLowerCase();
-  const path = url.pathname.toLowerCase();
-
-  if (host.includes("youtube.com") || host.includes("youtu.be") || host.includes("vimeo.com")) {
-    return "video";
-  }
-
-  if (
-    host.includes("spotify.com") ||
-    host.includes("podcasts.apple.com") ||
-    host.includes("soundcloud.com")
-  ) {
-    return "podcast";
-  }
-
-  if (path.endsWith(".pdf")) return "article";
-  return "article";
-}
-
-function mockTitle(modality: SavedModality, source: string) {
-  if (modality === "video") return `${source} video`;
-  if (modality === "podcast") return `${source} podcast`;
-  return `${source} article`;
-}
-
-function mockDuration(modality: SavedModality) {
-  if (modality === "video") return 8 + Math.floor(Math.random() * 22);
-  if (modality === "podcast") return 12 + Math.floor(Math.random() * 35);
-  return 6 + Math.floor(Math.random() * 14);
-}
-
-function mockDescription(modality: SavedModality, source: string) {
-  void modality;
-  void source;
-  return "";
-}
-
-function minimalTitleFromUrl(url: URL) {
-  const host = hostLabel(url.hostname);
-  const lastSegment = url.pathname
-    .split("/")
-    .filter(Boolean)
-    .slice(-1)[0];
-  const segment = lastSegment ? decodeURIComponent(lastSegment).replace(/[-_]+/g, " ") : "";
-  const cleaned = segment.replace(/\.(html?|php|aspx?)$/i, "").trim();
-  if (cleaned && cleaned.length >= 3) return cleaned;
-  return host;
-}
-
-function buildMockSavedItem(rawUrl: string): Omit<SavedQueueItem, "id" | "savedBy" | "notes"> {
-  const url = new URL(normalizeUrl(rawUrl));
-  const modality = modalityFromUrl(url);
-  const source = hostLabel(url.hostname);
-  const title = minimalTitleFromUrl(url);
-  const durationMinutes = mockDuration(modality);
-  const description = "";
-  const thumbnailUrl = `https://picsum.photos/seed/${encodeURIComponent(url.hostname + url.pathname)}/960/540`;
-  const dateSaved = new Date().toISOString().slice(0, 10);
-
-  return {
-    title,
-    url: url.toString(),
-    modality,
-    thumbnailUrl,
-    durationMinutes,
-    source,
-    status: "saved",
-    dateSaved,
-    description,
-  };
 }
 
 export default function Home() {
@@ -241,14 +141,46 @@ export default function Home() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionAlternative | null>(null);
 
-  const [saveUrl, setSaveUrl] = useState<string | null>(null);
-  const [saveDraft, setSaveDraft] = useState<
-    (Omit<SavedQueueItem, "id" | "savedBy" | "notes"> & { savedBy: string; notes: string }) | null
-  >(null);
-  const [saveFeedback, setSaveFeedback] = useState<"idle" | "saved">("idle");
-  const [resolveStatus, setResolveStatus] = useState<"idle" | "loading" | "resolved" | "failed">(
-    "idle",
-  );
+  const {
+    saveUrl,
+    saveDraft,
+    setSaveDraft,
+    saveFeedback,
+    resolveStatus,
+    openFromUrl,
+    closeSaveFlow,
+    saveToLibrary,
+  } = useSaveToBingeFlow({
+    sessionToken,
+    onServerSaved: (saved) => {
+      const item = saved as {
+        id?: string;
+        title?: string;
+        url?: string;
+        modality?: SavedModality;
+        thumbnailUrl?: string;
+        durationMinutes?: number;
+        source?: string;
+        savedBy?: string;
+        description?: string;
+      };
+
+      if (item?.id && item.url && item.title && item.modality && item.durationMinutes && item.source) {
+        setTodaysRecommendation({
+          id: item.id,
+          title: item.title,
+          url: item.url,
+          modality: item.modality,
+          durationMinutes: item.durationMinutes,
+          sharedBy: item.savedBy ?? "Me",
+          description: item.description ?? "",
+          why: "Latest item you saved to your library.",
+          source: item.source,
+          thumbnailUrl: item.thumbnailUrl ?? "",
+        });
+      }
+    },
+  });
 
   const prompt = useMemo(() => {
     const q = query.trim();
@@ -593,12 +525,8 @@ export default function Home() {
     if (!q) return;
 
     if (looksLikeUrl(q)) {
-      const normalized = normalizeUrl(q);
       setQuery("");
-      const base = buildMockSavedItem(normalized);
-      setSaveUrl(base.url);
-      setSaveDraft({ ...base, savedBy: "Me", notes: "" });
-      void resolveLink(base.url);
+      openFromUrl(q);
       return;
     }
 
@@ -618,147 +546,19 @@ export default function Home() {
     if (!looksLikeUrl(pasted)) return;
     e.preventDefault();
 
-    const normalized = normalizeUrl(pasted);
     setQuery("");
-    const base = buildMockSavedItem(normalized);
-    setSaveUrl(base.url);
-    setSaveDraft({ ...base, savedBy: "Me", notes: "" });
-    void resolveLink(base.url);
+    openFromUrl(pasted);
   }
 
-  function closeSaveFlow() {
-    setSaveUrl(null);
-    setSaveDraft(null);
-    setSaveFeedback("idle");
-    setResolveStatus("idle");
-  }
+  async function saveToLibraryAndNavigate() {
+    const result = await saveToLibrary();
+    if (!result.localItem) return;
 
-  async function saveToLibrary() {
-    if (!saveDraft) return;
-
-    const item: SavedQueueItem = {
-      id: `u_${Date.now().toString(36)}`,
-      title: saveDraft.title,
-      url: saveDraft.url,
-      modality: saveDraft.modality,
-      thumbnailUrl: saveDraft.thumbnailUrl,
-      durationMinutes: saveDraft.durationMinutes,
-      source: saveDraft.source,
-      savedBy: saveDraft.savedBy.trim() ? saveDraft.savedBy.trim() : "Me",
-      status: "saved",
-      dateSaved: saveDraft.dateSaved,
-      description: saveDraft.description,
-      notes: saveDraft.notes.trim() ? saveDraft.notes.trim() : undefined,
-    };
-
-    try {
-      const sessionRes = await supabase?.auth.getSession();
-      const token = sessionRes?.data?.session?.access_token;
-      if (token) {
-        const res = await fetch("/api/saved-items", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            url: item.url,
-            title: item.title,
-            modality: item.modality,
-            thumbnailUrl: item.thumbnailUrl,
-            durationMinutes: item.durationMinutes,
-            source: item.source,
-            savedBy: item.savedBy,
-            status: item.status,
-            dateSaved: item.dateSaved,
-            description: item.description,
-            notes: item.notes,
-          }),
-        });
-
-        if (res.ok) {
-          const data = (await res.json()) as { item?: { id: string; title: string; url: string; modality: SavedModality; thumbnailUrl?: string; durationMinutes: number; source: string; savedBy: string; description?: string } };
-          const saved = data.item;
-          if (saved?.id && saved.url) {
-            setTodaysRecommendation({
-              id: saved.id,
-              title: saved.title,
-              url: saved.url,
-              modality: saved.modality,
-              durationMinutes: saved.durationMinutes,
-              sharedBy: saved.savedBy,
-              description: saved.description ?? "",
-              why: "Latest item you saved to your library.",
-              source: saved.source,
-              thumbnailUrl: saved.thumbnailUrl ?? item.thumbnailUrl,
-            });
-          }
-        }
-      }
-    } catch {
-      // Ignore server persistence failures
-    }
-
-    try {
-      const raw =
-        typeof window !== "undefined" ? window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY) : null;
-      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-      const existing = Array.isArray(parsed) ? (parsed as SavedQueueItem[]) : [];
-      const next = [item, ...existing].slice(0, 200);
-      window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Ignore
-    }
-
-    setSaveFeedback("saved");
     window.setTimeout(() => {
       setQuery("");
       closeSaveFlow();
       router.push("/library");
     }, 1200);
-  }
-
-  async function resolveLink(url: string) {
-    try {
-      setResolveStatus("loading");
-      const res = await fetch("/api/resolve-link", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!res.ok) {
-        setResolveStatus("failed");
-        return;
-      }
-
-      const data = (await res.json()) as ResolvedLink;
-
-      setSaveDraft((prev) => {
-        if (!prev) return prev;
-        const nextTitle = (data.title ?? "").trim();
-        const nextDescription = (data.description ?? "").trim();
-        return {
-          ...prev,
-          title: nextTitle ? nextTitle : prev.title,
-          description: nextDescription ? nextDescription : prev.description,
-          modality: data.modality || prev.modality,
-          durationMinutes: data.durationMinutes ?? prev.durationMinutes,
-          source: data.source ?? prev.source,
-          provider: data.provider ?? prev.provider,
-          canonicalUrl: data.canonicalUrl ?? prev.canonicalUrl,
-          url: data.canonicalUrl ?? data.url ?? prev.url,
-          thumbnailUrl: data.image ?? prev.thumbnailUrl,
-        };
-      });
-
-      setSaveUrl((prev) => data.canonicalUrl ?? data.url ?? prev);
-      setResolveStatus("resolved");
-    } catch {
-      setResolveStatus("failed");
-    }
   }
 
   function toggleVoiceInput() {
@@ -786,9 +586,9 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh overflow-x-hidden">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
-        <div className="mx-auto w-full max-w-lg px-5 py-3">
-          <div className="flex items-center justify-between">
+      <header className="fixed inset-x-0 top-0 z-30 h-[60px] border-b border-white/10 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex h-full w-full max-w-lg items-center px-5">
+          <div className="flex w-full items-center justify-between">
             <div
               className="text-[17px] font-semibold tracking-[-0.04em] text-foreground/90"
               style={{ fontFamily: "Calibri, Arial, Helvetica, sans-serif" }}
@@ -877,7 +677,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-7 pt-4">
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-7 pt-[76px]">
         <div className="flex-1">
           <section className="mt-7">
             <form onSubmit={onSubmit}>
@@ -1195,7 +995,7 @@ export default function Home() {
                   <div className="mt-5 flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={saveToLibrary}
+                      onClick={saveToLibraryAndNavigate}
                       disabled={saveFeedback === "saved"}
                       className={`inline-flex h-12 flex-1 items-center justify-center rounded-2xl text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.35)] ring-1 ring-blue-300/30 transition duration-200 active:scale-[0.99] disabled:opacity-90 ${
                         saveFeedback === "saved"
