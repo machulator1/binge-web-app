@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
+const MAX_MESSAGE_LENGTH = 180;
+
 type Payload = {
   url: string;
   title: string;
@@ -22,6 +24,7 @@ export function SendToFriendSheet({
 }) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [handle, setHandle] = useState("");
+  const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed" | "unauthorized">(
     "idle",
   );
@@ -30,6 +33,7 @@ export function SendToFriendSheet({
   useEffect(() => {
     if (!open) {
       setHandle("");
+      setMessage("");
       setStatus("idle");
       setError(null);
     }
@@ -47,6 +51,7 @@ export function SendToFriendSheet({
 
     const h = handle.trim();
     if (!h) return;
+    const trimmedMessage = message.trim();
 
     try {
       setStatus("sending");
@@ -72,6 +77,7 @@ export function SendToFriendSheet({
           summary: payload.summary,
           thumbnailUrl: payload.thumbnailUrl,
           source: payload.source,
+          message: trimmedMessage || undefined,
         }),
       });
 
@@ -110,6 +116,21 @@ export function SendToFriendSheet({
                 placeholder="@ava"
                 className="h-12 w-full rounded-2xl border border-white/10 bg-black/10 px-4 text-sm font-semibold text-foreground outline-none placeholder:text-foreground/35 focus:border-white/18"
               />
+            </label>
+
+            <label className="mt-3 block">
+              <span className="sr-only">Comment</span>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+                placeholder="Add a comment"
+                rows={2}
+                maxLength={MAX_MESSAGE_LENGTH}
+                className="max-h-20 min-h-16 w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm font-semibold leading-5 text-foreground outline-none placeholder:text-foreground/35 focus:border-white/18"
+              />
+              <span className="mt-1 block text-right text-[11px] font-semibold text-foreground/35">
+                {message.length}/{MAX_MESSAGE_LENGTH}
+              </span>
             </label>
 
             {status === "sent" ? (

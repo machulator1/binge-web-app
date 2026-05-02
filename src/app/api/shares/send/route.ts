@@ -26,6 +26,11 @@ function normalizeHandle(value: string) {
     .slice(0, 24);
 }
 
+function normalizeMessage(value?: string) {
+  const message = (value ?? "").trim().slice(0, 180);
+  return message || null;
+}
+
 export async function POST(req: Request) {
   const token = getBearerToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,6 +44,7 @@ export async function POST(req: Request) {
 
   const toHandle = normalizeHandle(body.toHandle ?? "");
   const url = (body.url ?? "").trim();
+  const message = normalizeMessage(body.message);
 
   if (!toHandle) return NextResponse.json({ error: "Missing toHandle" }, { status: 400 });
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
@@ -74,7 +80,8 @@ export async function POST(req: Request) {
       to_user_id: profile.id,
       url,
       title: body.title ?? null,
-      summary: body.summary ?? body.message ?? null,
+      summary: body.summary ?? null,
+      message,
       thumbnail_url: body.thumbnailUrl ?? null,
       source: body.source ?? null,
     };

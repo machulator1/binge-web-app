@@ -16,6 +16,7 @@ type ShareRow = {
   url: string;
   title: string | null;
   summary: string | null;
+  message: string | null;
   thumbnail_url: string | null;
   source: string | null;
   opened_at: string | null;
@@ -134,7 +135,7 @@ export default function InboxPage() {
       savedAt,
       dateSaved: savedAt.slice(0, 10),
       description: row.summary ?? undefined,
-      notes: undefined,
+      notes: row.message ?? undefined,
     };
 
     try {
@@ -215,6 +216,11 @@ export default function InboxPage() {
                   {row.summary ? (
                     <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-foreground/60">
                       {row.summary}
+                    </div>
+                  ) : null}
+                  {row.message ? (
+                    <div className="mt-3 line-clamp-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium italic leading-5 text-foreground/55">
+                      “{row.message}”
                     </div>
                   ) : null}
                   <div className="mt-3 flex items-center justify-between gap-3">
