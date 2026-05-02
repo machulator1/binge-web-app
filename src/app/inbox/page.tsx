@@ -38,6 +38,7 @@ type SavedQueueItem = {
   savedBy: string;
   status: "saved";
   dateSaved: string;
+  savedAt?: string;
   description?: string;
   notes?: string;
 };
@@ -119,6 +120,7 @@ export default function InboxPage() {
 
   function saveToLibrary(row: ShareRow) {
     const title = row.title ?? "Shared link";
+    const savedAt = new Date().toISOString();
     const item: SavedQueueItem = {
       id: `s_${Date.now().toString(36)}`,
       title,
@@ -129,7 +131,8 @@ export default function InboxPage() {
       source: row.source ?? "Shared",
       savedBy: "Me",
       status: "saved",
-      dateSaved: new Date().toISOString().slice(0, 10),
+      savedAt,
+      dateSaved: savedAt.slice(0, 10),
       description: row.summary ?? undefined,
       notes: undefined,
     };

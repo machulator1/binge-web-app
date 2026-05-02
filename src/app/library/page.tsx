@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { SendToFriendSheet } from "@/components/SendToFriendSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
+import { savedAtFromDateSaved, savedDateLabel } from "@/lib/savedDate";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { looksLikeUrl } from "@/lib/urlImport";
 import { useSaveToBingeFlow } from "@/lib/useSaveToBingeFlow";
@@ -24,6 +25,7 @@ type QueueItem = {
   sharedBy?: string;
   status: ItemStatus;
   dateSaved: string; // YYYY-MM-DD
+  savedAt?: string;
   thumbnailUrl?: string;
   description?: string;
   notes?: string;
@@ -76,6 +78,10 @@ type SendPayload = {
   thumbnailUrl?: string;
   source?: string;
 };
+
+function withSavedAt(item: QueueItem): QueueItem {
+  return { ...item, savedAt: item.savedAt ?? savedAtFromDateSaved(item.dateSaved) };
+}
 
 type ResolvedLink = {
   url: string;
@@ -223,11 +229,14 @@ function Row({
 
       <div className="relative isolate -my-4 overflow-x-auto overflow-y-visible overscroll-x-contain bg-transparent px-5 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex snap-x snap-mandatory gap-3 pr-5 scroll-smooth">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className={`${cardWidth} snap-start shrink-0 overflow-hidden rounded-[22px] border border-white/12 bg-slate-800/95 shadow-[0_18px_28px_-22px_rgba(0,0,0,0.75)] transition duration-200 active:scale-[0.99]`}
-            >
+          {items.map((item) => {
+            const savedLabel = savedDateLabel(item.savedAt ?? savedAtFromDateSaved(item.dateSaved));
+
+            return (
+              <article
+                key={item.id}
+                className={`${cardWidth} snap-start shrink-0 overflow-hidden rounded-[22px] border border-white/12 bg-slate-800/95 shadow-[0_18px_28px_-22px_rgba(0,0,0,0.75)] transition duration-200 active:scale-[0.99]`}
+              >
               <div className={`relative ${thumbHeight} w-full overflow-hidden bg-black/20`}>
                 <CardThumb item={item} size={size} />
               </div>
@@ -257,6 +266,9 @@ function Row({
                       <span className="truncate text-[11px] font-semibold text-white/60">
                         Shared by {item.sharedBy}
                       </span>
+                    ) : null}
+                    {savedLabel ? (
+                      <span className="truncate text-[11px] font-semibold text-white/45">{savedLabel}</span>
                     ) : null}
                   </div>
                 </div>
@@ -356,8 +368,9 @@ function Row({
                   </div>
                 </div>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -475,7 +488,7 @@ export default function LibraryPage() {
         const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY);
         const parsed = raw ? (JSON.parse(raw) as unknown) : [];
         const stored = Array.isArray(parsed) ? (parsed as QueueItem[]) : [];
-        setItems(stored.map((it) => ({ ...it, storage: it.storage ?? "local" })));
+        setItems(stored.map((it) => withSavedAt({ ...it, storage: it.storage ?? "local" })));
       } catch {
         // Ignore
       }
@@ -508,7 +521,7 @@ export default function LibraryPage() {
 
         const data = (await res.json()) as { items?: QueueItem[] };
         const loaded = Array.isArray(data.items) ? (data.items as QueueItem[]) : [];
-        const next = loaded.map((it) => ({ ...it, storage: "server" as const }));
+        const next = loaded.map((it) => withSavedAt({ ...it, storage: "server" as const }));
         if (cancelled) return;
         setItems(next);
 
@@ -536,6 +549,7 @@ export default function LibraryPage() {
                   source: it.source,
                   savedBy: it.savedBy,
                   status: it.status,
+                  savedAt: it.savedAt,
                   dateSaved: it.dateSaved,
                   description: it.description,
                   notes: it.notes,
@@ -555,7 +569,7 @@ export default function LibraryPage() {
             ? (refreshedData.items as QueueItem[])
             : [];
           if (cancelled) return;
-          setItems(refreshedItems.map((it) => ({ ...it, storage: "server" as const })));
+          setItems(refreshedItems.map((it) => withSavedAt({ ...it, storage: "server" as const })));
           window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify([]));
         } catch {
           // Ignore migration failures
@@ -665,6 +679,7 @@ export default function LibraryPage() {
                 source: patched.source,
                 savedBy: patched.savedBy,
                 status: patched.status,
+                savedAt: patched.savedAt,
                 dateSaved: patched.dateSaved,
                 description: patched.description,
                 notes: patched.notes,
@@ -728,6 +743,7 @@ export default function LibraryPage() {
           savedBy: "Friend",
           sharedBy: s.fromHandle ? `@${s.fromHandle}` : "a friend",
           status: "saved" as const,
+          savedAt: s.created_at ?? new Date().toISOString(),
           dateSaved: (s.created_at ?? new Date().toISOString()).slice(0, 10),
           thumbnailUrl: s.thumbnail_url ?? undefined,
           description: s.summary ?? undefined,
@@ -780,6 +796,7 @@ export default function LibraryPage() {
             source: story.source,
             savedBy: "Daily Brief",
             status: "saved" as const,
+            savedAt: new Date().toISOString(),
             dateSaved: new Date().toISOString().slice(0, 10),
             thumbnailUrl: story.thumbnailUrl,
             description: story.summary,
@@ -858,6 +875,7 @@ export default function LibraryPage() {
           source: string;
           savedBy: string;
           status: ItemStatus;
+          savedAt?: string;
           dateSaved: string;
           thumbnailUrl?: string;
           description?: string;

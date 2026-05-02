@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
+import { savedAtFromDateSaved, savedDateLabel } from "@/lib/savedDate";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { looksLikeUrl } from "@/lib/urlImport";
 import { SendToFriendSheet } from "@/components/SendToFriendSheet";
@@ -46,6 +47,7 @@ type SavedQueueItem = {
   savedBy: string;
   status: "saved";
   dateSaved: string;
+  savedAt?: string;
   description?: string;
   notes?: string;
 };
@@ -64,6 +66,7 @@ type HomeRecommendation = {
   why: string;
   source: string;
   thumbnailUrl: string;
+  savedAt?: string;
 };
 
 type SendPayload = {
@@ -162,6 +165,7 @@ export default function Home() {
         durationMinutes?: number;
         source?: string;
         savedBy?: string;
+        savedAt?: string;
         description?: string;
       };
 
@@ -173,6 +177,7 @@ export default function Home() {
           modality: item.modality,
           durationMinutes: item.durationMinutes,
           sharedBy: item.savedBy ?? "Me",
+          savedAt: item.savedAt,
           description: item.description ?? "",
           why: "Latest item you saved to your library.",
           source: item.source,
@@ -394,13 +399,18 @@ export default function Home() {
   }, [todaysRecommendation?.title, todaysRecommendation?.url]);
 
   const todaysRecommendationDescription = useMemo(() => {
-    const raw = (todaysRecommendation?.description ?? "").trim();
+    const raw = todaysRecommendation?.description?.trim() ?? "";
     if (!raw) return "";
     if (/^A short\b/i.test(raw)) return "";
     if (/^A focused\b/i.test(raw)) return "";
     if (/^A clean\b/i.test(raw)) return "";
     return raw;
   }, [todaysRecommendation?.description]);
+
+  const todaysRecommendationSavedLabel = useMemo(
+    () => savedDateLabel(todaysRecommendation?.savedAt),
+    [todaysRecommendation?.savedAt],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -434,6 +444,8 @@ export default function Home() {
             durationMinutes: number;
             source: string;
             savedBy: string;
+            dateSaved?: string;
+            savedAt?: string;
             description?: string;
           }>;
         };
@@ -453,6 +465,7 @@ export default function Home() {
             modality: latest.modality,
             durationMinutes: latest.durationMinutes,
             sharedBy: latest.savedBy,
+            savedAt: latest.savedAt ?? savedAtFromDateSaved(latest.dateSaved),
             description: latest.description ?? "",
             why: "Latest item you saved to your library.",
             source: latest.source,
@@ -483,7 +496,8 @@ export default function Home() {
         source: todaysRecommendation.source,
         savedBy: todaysRecommendation.sharedBy || "Me",
         status: "saved" as const,
-        dateSaved: new Date().toISOString().slice(0, 10),
+        savedAt: todaysRecommendation.savedAt,
+        dateSaved: (todaysRecommendation.savedAt ?? new Date().toISOString()).slice(0, 10),
         description: todaysRecommendation.description,
         notes: undefined,
       };
@@ -778,6 +792,11 @@ export default function Home() {
                       <span className="inline-flex h-4 w-fit items-center justify-center rounded-full bg-white/5 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
                         {todaysRecommendation.durationMinutes} min
                       </span>
+                      {todaysRecommendationSavedLabel ? (
+                        <span className="text-[11px] font-semibold text-foreground/45">
+                          {todaysRecommendationSavedLabel}
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-3">

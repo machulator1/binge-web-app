@@ -33,6 +33,7 @@ type Body = {
   source?: string;
   savedBy?: string;
   status?: "saved" | "in_progress" | "consumed";
+  savedAt?: string;
   dateSaved?: string;
   description?: string;
   notes?: string;
@@ -49,6 +50,7 @@ function rowToItem(row: SavedItemRow) {
     savedBy: row.saved_by ?? "Me",
     status: row.status ?? "saved",
     dateSaved: (row.date_saved ?? row.created_at ?? new Date().toISOString()).slice(0, 10),
+    savedAt: row.created_at ?? (row.date_saved ? `${row.date_saved}T00:00:00.000Z` : undefined),
     thumbnailUrl: row.thumbnail_url ?? undefined,
     description: row.description ?? undefined,
     notes: row.notes ?? undefined,
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
       source: body.source ?? null,
       saved_by: body.savedBy ?? "Me",
       status: body.status ?? "saved",
-      date_saved: body.dateSaved ?? null,
+      date_saved: body.dateSaved ?? (body.savedAt ? body.savedAt.slice(0, 10) : null),
       description: body.description ?? null,
       notes: body.notes ?? null,
     };

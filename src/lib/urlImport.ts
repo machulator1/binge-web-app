@@ -72,7 +72,8 @@ export function buildMockSavedItem(rawUrl: string) {
   const durationMinutes = mockDuration(modality);
   const description = "";
   const thumbnailUrl = `https://picsum.photos/seed/${encodeURIComponent(url.hostname + url.pathname)}/960/540`;
-  const dateSaved = new Date().toISOString().slice(0, 10);
+  const savedAt = new Date().toISOString();
+  const dateSaved = savedAt.slice(0, 10);
 
   return {
     title,
@@ -82,6 +83,7 @@ export function buildMockSavedItem(rawUrl: string) {
     durationMinutes,
     source,
     status: "saved" as const,
+    savedAt,
     dateSaved,
     description,
   };
