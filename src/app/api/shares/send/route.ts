@@ -31,6 +31,12 @@ function normalizeMessage(value?: string) {
   return message || null;
 }
 
+function summaryWithMessage(summary?: string, message?: string | null) {
+  const cleanSummary = (summary ?? "").trim();
+  if (!message) return cleanSummary || null;
+  return `${cleanSummary}\n\n---BINGE_SHARE_MESSAGE---\n${message}`.trim();
+}
+
 export async function POST(req: Request) {
   const token = getBearerToken(req);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -80,8 +86,7 @@ export async function POST(req: Request) {
       to_user_id: profile.id,
       url,
       title: body.title ?? null,
-      summary: body.summary ?? null,
-      message,
+      summary: summaryWithMessage(body.summary, message),
       thumbnail_url: body.thumbnailUrl ?? null,
       source: body.source ?? null,
     };

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
+const SHARE_MESSAGE_DELIMITER = "---BINGE_SHARE_MESSAGE---";
+
 function getBearerToken(req: Request) {
   const h = req.headers.get("authorization") ?? "";
   const m = h.match(/^Bearer\s+(.+)$/i);
@@ -15,7 +17,6 @@ type ShareRow = {
   url: string;
   title: string | null;
   summary: string | null;
-  message: string | null;
   thumbnail_url: string | null;
   source: string | null;
   opened_at: string | null;
@@ -25,6 +26,17 @@ type ProfileRow = {
   id: string;
   handle: string | null;
 };
+
+function splitSummaryAndMessage(summary: string | null) {
+  if (!summary?.includes(SHARE_MESSAGE_DELIMITER)) return { summary, message: null };
+  const [rawSummary, rawMessage] = summary.split(SHARE_MESSAGE_DELIMITER);
+  const cleanSummary = rawSummary.trim();
+  const message = rawMessage?.trim() ?? "";
+  return {
+    summary: cleanSummary || null,
+    message: message || null,
+  };
+}
 
 export async function GET(req: Request) {
   const token = getBearerToken(req);
@@ -43,7 +55,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabase
       .from("shares")
       .select(
-        "id, created_at, from_user_id, to_user_id, url, title, summary, message, thumbnail_url, source, opened_at",
+        "id, created_at, from_user_id, to_user_id, url, title, summary, thumbnail_url, source, opened_at",
       )
       .eq("to_user_id", userData.user.id)
       .order("created_at", { ascending: false })
@@ -69,10 +81,15 @@ export async function GET(req: Request) {
       }
     }
 
-    const enriched = rows.map((r) => ({
-      ...r,
-      fromHandle: profilesById.get(r.from_user_id) ?? null,
-    }));
+    const enriched = rows.map((r) => {
+      const parsed = splitSummaryAndMessage(r.summary);
+      return {
+        ...r,
+        summary: parsed.summary,
+        message: parsed.message,
+        fromHandle: profilesById.get(r.from_user_id) ?? null,
+      };
+    });
 
     return NextResponse.json({ shares: enriched }, { status: 200 });
   } catch {
