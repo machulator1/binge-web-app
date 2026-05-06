@@ -21,6 +21,10 @@ function shortcutLog(message: string, details?: Record<string, string | number |
   console.log("[save-from-shortcut]", message, details ?? {});
 }
 
+function failure(message: string, code: string) {
+  return NextResponse.json({ success: false, message, code }, { status: 200 });
+}
+
 function textFromShortcutValue(value: unknown) {
   if (typeof value === "string") return value.trim();
   if (Array.isArray(value)) {
@@ -83,7 +87,7 @@ export async function POST(req: Request) {
     body = (await req.json()) as Body;
   } catch {
     shortcutLog("invalid json");
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
+    return failure("Shortcut sent invalid data", "invalid_json");
   }
 
   const rawUrl = textFromShortcutValue(body.url);
@@ -91,12 +95,12 @@ export async function POST(req: Request) {
 
   if (!rawUrl) {
     shortcutLog("missing url");
-    return NextResponse.json({ success: false, message: "Missing URL" }, { status: 200 });
+    return failure("Missing URL", "missing_url");
   }
 
   if (!token) {
     shortcutLog("missing token");
-    return NextResponse.json({ success: false, message: "Missing token" }, { status: 200 });
+    return failure("Missing token", "missing_token");
   }
 
   let normalizedUrl: string;
@@ -105,14 +109,14 @@ export async function POST(req: Request) {
     new URL(normalizedUrl);
   } catch {
     shortcutLog("invalid url");
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
+    return failure("Invalid URL from Shortcut", "invalid_url");
   }
 
   try {
     const userId = await findUserIdBySaveToken(token);
     if (!userId) {
       shortcutLog("missing or invalid token");
-      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 200 });
+      return failure("Invalid shortcut token", "invalid_token");
     }
 
     const supabase = getSupabaseServiceClient();
@@ -131,7 +135,8 @@ export async function POST(req: Request) {
       .limit(1);
 
     if (existingError) {
-      throw existingError;
+      shortcutLog("duplicate check failed", { message: existingError.message });
+      return failure("Could not check your library", "duplicate_check_failed");
     }
 
     const existing = Array.isArray(existingRows) ? (existingRows[0] as SavedItemRow | undefined) : undefined;
@@ -155,7 +160,8 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (error || !data) {
-      throw error ?? new Error("No saved item returned");
+      shortcutLog("insert failed", { message: error?.message ?? "No saved item returned" });
+      return failure("Could not save into your library", "insert_failed");
     }
 
     const row = data as SavedItemRow;
@@ -171,7 +177,11 @@ export async function POST(req: Request) {
       { status: 200 },
     );
   } catch (error) {
-    shortcutLog("save failed", { message: error instanceof Error ? error.message : "unknown" });
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
+    const message = error instanceof Error ? error.message : "unknown";
+    shortcutLog("save failed", { message });
+    if (message.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+      return failure("Vercel secret is missing or not deployed", "missing_service_key");
+    }
+    return failure("Binge server error while saving", "server_error");
   }
 }
