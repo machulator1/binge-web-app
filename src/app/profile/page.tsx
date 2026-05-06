@@ -11,6 +11,8 @@ export default function ProfilePage() {
 
   const [email, setEmail] = useState<string | null>(null);
   const [handle, setHandle] = useState("");
+  const [saveToken, setSaveToken] = useState("");
+  const [tokenStatus, setTokenStatus] = useState<"idle" | "loading" | "failed" | "copied">("idle");
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "unauthorized" | "failed">(
     "idle",
   );
@@ -35,6 +37,27 @@ export default function ProfilePage() {
         }
 
         setEmail(session.user.email ?? null);
+
+        try {
+          setTokenStatus("loading");
+          const tokenRes = await fetch("/api/shortcut-token", {
+            headers: {
+              authorization: `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          });
+          if (tokenRes.ok) {
+            const tokenData = (await tokenRes.json()) as { saveToken?: string };
+            if (!cancelled) {
+              setSaveToken(tokenData.saveToken ?? "");
+              setTokenStatus("idle");
+            }
+          } else if (!cancelled) {
+            setTokenStatus("failed");
+          }
+        } catch {
+          if (!cancelled) setTokenStatus("failed");
+        }
 
         const { data: profile } = await supabase
           .from("profiles")
@@ -113,6 +136,17 @@ export default function ProfilePage() {
     }
   }
 
+  async function copyToken() {
+    if (!saveToken) return;
+    try {
+      await navigator.clipboard.writeText(saveToken);
+      setTokenStatus("copied");
+      window.setTimeout(() => setTokenStatus("idle"), 1200);
+    } catch {
+      setTokenStatus("failed");
+    }
+  }
+
   return (
     <div className="min-h-dvh overflow-x-hidden">
       <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 pb-10 pt-11">
@@ -171,6 +205,36 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {status !== "unauthorized" ? (
+          <section className="mt-4 rounded-[28px] border border-white/10 bg-slate-800/60 p-5">
+            <div className="text-sm font-semibold text-foreground/80">Save from iPhone Shortcut</div>
+            <div className="mt-1 text-xs font-medium leading-5 text-foreground/55">
+              Copy this token into the iPhone Shortcut. Treat it like a password.
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-white/10 bg-black/10 p-3 text-xs font-semibold leading-5 text-foreground/75">
+              {tokenStatus === "loading"
+                ? "Creating token…"
+                : saveToken || "Token unavailable until database setup is complete."}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void copyToken()}
+              disabled={!saveToken || tokenStatus === "loading"}
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-white/12 bg-white/5 text-sm font-semibold text-foreground/75 transition duration-200 hover:bg-white/10 active:bg-white/12 disabled:opacity-50"
+            >
+              {tokenStatus === "copied" ? "Copied" : "Copy shortcut token"}
+            </button>
+
+            {tokenStatus === "failed" ? (
+              <div className="mt-3 text-xs font-semibold text-foreground/60">
+                Could not load the token. The database may need a save_token field first.
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </main>
     </div>
   );

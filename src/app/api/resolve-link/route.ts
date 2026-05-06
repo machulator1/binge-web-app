@@ -455,6 +455,116 @@ function canonicalUrl(html: string) {
   return m?.[1]?.trim() ?? null;
 }
 
+export async function resolveLinkMetadata(input: string): Promise<ResolvedLink> {
+  let parsed: URL;
+  try {
+    parsed = new URL(input);
+  } catch {
+    throw new Error("Invalid url");
+  }
+
+  const modality = guessModalityFromUrl(parsed);
+  const source = hostLabel(parsed.hostname);
+
+  const youtubeId = modality === "video" ? extractYouTubeId(parsed) : null;
+
+  if (youtubeId) {
+    const apiKey = (process.env.YOUTUBE_API_KEY ?? "").trim();
+    if (apiKey) {
+      try {
+        const yt = await fetchYouTubeDataApi(youtubeId, apiKey);
+        if (yt) {
+          const youtubeFallbackImage = `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
+          return {
+            url: input,
+            canonicalUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}`,
+            title: yt.title,
+            description: yt.description ?? undefined,
+            image: yt.image ?? youtubeFallbackImage,
+            source: "YouTube",
+            modality: "video",
+            provider: "youtube",
+            durationMinutes: yt.durationMinutes ?? undefined,
+          };
+        }
+      } catch {
+        // Fall back to non-API resolver
+      }
+    }
+  }
+
+  const html = youtubeId ? await fetchYouTubeHtml(input, youtubeId) : await fetchHtml(input);
+  if (!html) {
+    throw new Error("Fetch failed");
+  }
+
+  let ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
+
+  const ogOrDocTitleRaw = extractTitle(html) ?? "";
+  const ogOrDocTitle = ogOrDocTitleRaw.replace(/\s-\sYouTube$/i, "").trim();
+  const title =
+    youtubeId && isGenericYouTubeTitle(ogOrDocTitle)
+      ? (ytDetails?.title ?? "")
+      : ogOrDocTitle;
+
+  const ogOrMetaDescription = extractDescription(html) ?? null;
+
+  const ogLooksGeneric = youtubeId && ogOrMetaDescription ? isGenericYouTubeDescription(ogOrMetaDescription) : false;
+  const titleLooksGeneric = youtubeId ? isGenericYouTubeTitle(ogOrDocTitle) : false;
+
+  if (youtubeId && (titleLooksGeneric || ogLooksGeneric) && !ytDetails) {
+    const retryUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}&hl=en&gl=US`;
+    const retryHtml = await fetchYouTubeHtml(retryUrl, youtubeId);
+    if (retryHtml) {
+      ytDetails = extractYouTubeVideoDetails(retryHtml);
+    }
+  }
+
+  const descriptionFromYouTube = youtubeId
+    ? (ytDetails?.description ?? extractYouTubeShortDescription(html))
+    : null;
+
+  const description = youtubeId
+    ? (ogOrMetaDescription && !ogLooksGeneric
+        ? ogOrMetaDescription
+        : descriptionFromYouTube ?? undefined)
+    : (ogOrMetaDescription ?? undefined);
+
+  const safeDescription = youtubeId && description ? (isGenericYouTubeDescription(description) ? undefined : description) : description;
+  const canon = canonicalUrl(html) ?? undefined;
+  const baseForImages = canon ?? input;
+  const ogImageRaw = extractImage(html);
+  const ogImage = ogImageRaw ? resolveUrl(ogImageRaw, baseForImages) : null;
+  const imageFromOg = ogImage && isLikelyImageUrl(ogImage) ? ogImage : null;
+  const imageFromPage = imageFromOg ? null : extractFirstImage(html, baseForImages);
+
+  const jsonLdCandidates = imageFromOg || imageFromPage ? [] : extractJsonLdImages(html);
+  const imageFromJsonLd =
+    jsonLdCandidates
+      .map((c) => resolveUrl(c, baseForImages))
+      .find((c): c is string => Boolean(c && isLikelyImageUrl(c))) ?? null;
+
+  const youtubeFallbackImage = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : null;
+  const image =
+    imageFromOg ??
+    imageFromPage ??
+    imageFromJsonLd ??
+    youtubeFallbackImage ??
+    domainThumbSvg({ hostname: parsed.hostname, modality });
+
+  return {
+    url: input,
+    canonicalUrl: canon,
+    title,
+    description: safeDescription,
+    image,
+    source,
+    modality,
+    provider: undefined,
+    durationMinutes: undefined,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as { url?: string };
@@ -463,113 +573,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing url" }, { status: 400 });
     }
 
-    let parsed: URL;
-    try {
-      parsed = new URL(input);
-    } catch {
-      return NextResponse.json({ error: "Invalid url" }, { status: 400 });
-    }
-
-    const modality = guessModalityFromUrl(parsed);
-    const source = hostLabel(parsed.hostname);
-
-    const youtubeId = modality === "video" ? extractYouTubeId(parsed) : null;
-
-    if (youtubeId) {
-      const apiKey = (process.env.YOUTUBE_API_KEY ?? "").trim();
-      if (apiKey) {
-        try {
-          const yt = await fetchYouTubeDataApi(youtubeId, apiKey);
-          if (yt) {
-            const youtubeFallbackImage = `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
-            return NextResponse.json<ResolvedLink>({
-              url: input,
-              canonicalUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}`,
-              title: yt.title,
-              description: yt.description ?? undefined,
-              image: yt.image ?? youtubeFallbackImage,
-              source: "YouTube",
-              modality: "video",
-              provider: "youtube",
-              durationMinutes: yt.durationMinutes ?? undefined,
-            });
-          }
-        } catch {
-          // Fall back to non-API resolver
-        }
-      }
-    }
-
-    const html = youtubeId ? await fetchYouTubeHtml(input, youtubeId) : await fetchHtml(input);
-    if (!html) {
-      return NextResponse.json({ error: "Fetch failed" }, { status: 502 });
-    }
-
-    let ytDetails = youtubeId ? extractYouTubeVideoDetails(html) : null;
-
-    const ogOrDocTitleRaw = extractTitle(html) ?? "";
-    const ogOrDocTitle = ogOrDocTitleRaw.replace(/\s-\sYouTube$/i, "").trim();
-    const title =
-      youtubeId && isGenericYouTubeTitle(ogOrDocTitle)
-        ? (ytDetails?.title ?? "")
-        : ogOrDocTitle;
-
-    const ogOrMetaDescription = extractDescription(html) ?? null;
-
-    const ogLooksGeneric = youtubeId && ogOrMetaDescription ? isGenericYouTubeDescription(ogOrMetaDescription) : false;
-    const titleLooksGeneric = youtubeId ? isGenericYouTubeTitle(ogOrDocTitle) : false;
-
-    if (youtubeId && (titleLooksGeneric || ogLooksGeneric) && !ytDetails) {
-      const retryUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(youtubeId)}&hl=en&gl=US`;
-      const retryHtml = await fetchYouTubeHtml(retryUrl, youtubeId);
-      if (retryHtml) {
-        ytDetails = extractYouTubeVideoDetails(retryHtml);
-      }
-    }
-
-    const descriptionFromYouTube = youtubeId
-      ? (ytDetails?.description ?? extractYouTubeShortDescription(html))
-      : null;
-
-    const description = youtubeId
-      ? (ogOrMetaDescription && !ogLooksGeneric
-          ? ogOrMetaDescription
-          : descriptionFromYouTube ?? undefined)
-      : (ogOrMetaDescription ?? undefined);
-
-    const safeDescription = youtubeId && description ? (isGenericYouTubeDescription(description) ? undefined : description) : description;
-    const canon = canonicalUrl(html) ?? undefined;
-    const baseForImages = canon ?? input;
-    const ogImageRaw = extractImage(html);
-    const ogImage = ogImageRaw ? resolveUrl(ogImageRaw, baseForImages) : null;
-    const imageFromOg = ogImage && isLikelyImageUrl(ogImage) ? ogImage : null;
-    const imageFromPage = imageFromOg ? null : extractFirstImage(html, baseForImages);
-
-    const jsonLdCandidates = imageFromOg || imageFromPage ? [] : extractJsonLdImages(html);
-    const imageFromJsonLd =
-      jsonLdCandidates
-        .map((c) => resolveUrl(c, baseForImages))
-        .find((c): c is string => Boolean(c && isLikelyImageUrl(c))) ?? null;
-
-    const youtubeFallbackImage = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` : null;
-    const image =
-      imageFromOg ??
-      imageFromPage ??
-      imageFromJsonLd ??
-      youtubeFallbackImage ??
-      domainThumbSvg({ hostname: parsed.hostname, modality });
-
-    return NextResponse.json<ResolvedLink>({
-      url: input,
-      canonicalUrl: canon,
-      title,
-      description: safeDescription,
-      image,
-      source,
-      modality,
-      provider: undefined,
-      durationMinutes: undefined,
-    });
+    const resolved = await resolveLinkMetadata(input);
+    return NextResponse.json<ResolvedLink>(resolved);
   } catch {
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }
