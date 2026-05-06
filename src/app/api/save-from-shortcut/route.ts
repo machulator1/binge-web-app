@@ -41,6 +41,28 @@ function textFromShortcutValue(value: unknown) {
   return "";
 }
 
+function urlFromShortcutValue(value: unknown): string {
+  const text = textFromShortcutValue(value);
+  const directUrl = text.match(/https?:\/\/[^\s"'<>]+/i)?.[0]?.trim();
+  if (directUrl) return directUrl;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = urlFromShortcutValue(item);
+      if (nested) return nested;
+    }
+  }
+
+  if (value && typeof value === "object") {
+    for (const nestedValue of Object.values(value as Record<string, unknown>)) {
+      const nested = urlFromShortcutValue(nestedValue);
+      if (nested) return nested;
+    }
+  }
+
+  return text;
+}
+
 function userIdFromEnvToken(token: string) {
   const raw = (process.env.SHORTCUT_SAVE_TOKENS ?? "").trim();
   if (!raw) return null;
@@ -90,7 +112,7 @@ export async function POST(req: Request) {
     return failure("Shortcut sent invalid data", "invalid_json");
   }
 
-  const rawUrl = textFromShortcutValue(body.url);
+  const rawUrl = urlFromShortcutValue(body.url);
   const token = textFromShortcutValue(body.token);
 
   if (!rawUrl) {
