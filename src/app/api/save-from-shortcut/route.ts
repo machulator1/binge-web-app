@@ -7,8 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Body = {
-  url?: string;
-  token?: string;
+  url?: unknown;
+  token?: unknown;
 };
 
 type ProfileRow = {
@@ -19,6 +19,22 @@ type ProfileRow = {
 
 function shortcutLog(message: string, details?: Record<string, string | number | boolean | null>) {
   console.log("[save-from-shortcut]", message, details ?? {});
+}
+
+function textFromShortcutValue(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string" && item.trim());
+    return typeof first === "string" ? first.trim() : "";
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "URL", "absoluteString", "href", "text", "Text"]) {
+      const candidate = record[key];
+      if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+    }
+  }
+  return "";
 }
 
 function userIdFromEnvToken(token: string) {
@@ -67,20 +83,20 @@ export async function POST(req: Request) {
     body = (await req.json()) as Body;
   } catch {
     shortcutLog("invalid json");
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
   }
 
-  const rawUrl = (body.url ?? "").trim();
-  const token = (body.token ?? "").trim();
+  const rawUrl = textFromShortcutValue(body.url);
+  const token = textFromShortcutValue(body.token);
 
   if (!rawUrl) {
     shortcutLog("missing url");
-    return NextResponse.json({ success: false, message: "Missing URL" }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Missing URL" }, { status: 200 });
   }
 
   if (!token) {
     shortcutLog("missing token");
-    return NextResponse.json({ success: false, message: "Missing token" }, { status: 401 });
+    return NextResponse.json({ success: false, message: "Missing token" }, { status: 200 });
   }
 
   let normalizedUrl: string;
@@ -89,14 +105,14 @@ export async function POST(req: Request) {
     new URL(normalizedUrl);
   } catch {
     shortcutLog("invalid url");
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
   }
 
   try {
     const userId = await findUserIdBySaveToken(token);
     if (!userId) {
       shortcutLog("missing or invalid token");
-      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
+      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 200 });
     }
 
     const supabase = getSupabaseServiceClient();
@@ -156,6 +172,6 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     shortcutLog("save failed", { message: error instanceof Error ? error.message : "unknown" });
-    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 500 });
+    return NextResponse.json({ success: false, message: "Could not save this link" }, { status: 200 });
   }
 }
