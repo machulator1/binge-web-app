@@ -209,6 +209,7 @@ function Row({
   onShare,
   onSend,
   onDelete,
+  onChangeModality,
 }: {
   title: string;
   items: QueueItem[];
@@ -217,6 +218,7 @@ function Row({
   onShare: (item: QueueItem) => void;
   onSend?: (item: QueueItem) => void;
   onDelete?: (item: QueueItem) => void;
+  onChangeModality?: (item: QueueItem, modality: Modality) => void;
 }) {
   if (items.length === 0) return null;
 
@@ -256,11 +258,38 @@ function Row({
 
                 <div className="mt-4 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex h-4 items-center justify-center rounded-full px-2 text-[11px] font-semibold ring-1 ring-inset ${MODALITY_PILL[item.modality]}`}
-                    >
-                      {MODALITY_LABEL[item.modality]}
-                    </span>
+                    {onChangeModality ? (
+                      <label className="relative inline-flex h-6 items-center">
+                        <span className="sr-only">Change category</span>
+                        <select
+                          value={item.modality}
+                          onChange={(e) => onChangeModality(item, e.target.value as Modality)}
+                          className={`h-6 appearance-none rounded-full border-0 px-2 pr-6 text-[11px] font-semibold outline-none ring-1 ring-inset ${MODALITY_PILL[item.modality]}`}
+                        >
+                          <option value="article">Article</option>
+                          <option value="video">Video</option>
+                          <option value="podcast">Podcast</option>
+                        </select>
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="pointer-events-none absolute right-1.5 h-3.5 w-3.5 text-current/65"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </label>
+                    ) : (
+                      <span
+                        className={`inline-flex h-4 items-center justify-center rounded-full px-2 text-[11px] font-semibold ring-1 ring-inset ${MODALITY_PILL[item.modality]}`}
+                      >
+                        {MODALITY_LABEL[item.modality]}
+                      </span>
+                    )}
                     <span className="inline-flex h-4 items-center justify-center rounded-full bg-white/5 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
                       {item.durationMinutes} min
                     </span>
@@ -948,6 +977,48 @@ export default function LibraryPage() {
     }
   }
 
+  function changeItemModality(item: QueueItem, modality: Modality) {
+    if (item.modality === modality) return;
+
+    const nextItem: QueueItem = { ...item, modality };
+    setItems((prev) => prev.map((it) => (it.id === item.id ? nextItem : it)));
+
+    if (sessionToken && item.storage === "server" && item.url) {
+      void fetch("/api/saved-items", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({
+          url: item.url,
+          title: item.title,
+          modality,
+          thumbnailUrl: item.thumbnailUrl,
+          durationMinutes: item.durationMinutes,
+          source: item.source,
+          savedBy: item.savedBy,
+          status: item.status,
+          savedAt: item.savedAt,
+          dateSaved: item.dateSaved,
+          description: item.description,
+          notes: item.notes,
+        }),
+      });
+      return;
+    }
+
+    try {
+      const next = items.map((it) => (it.id === item.id ? nextItem : it));
+      window.localStorage.setItem(
+        SAVED_ITEMS_STORAGE_KEY,
+        JSON.stringify(next.map((it) => ({ ...it, storage: it.storage ?? "local" }))),
+      );
+    } catch {
+      // Ignore
+    }
+  }
+
   function deleteDailyBriefItem(item: QueueItem) {
     if (!confirm("Remove this story from Daily AI Brief?")) return;
     setDailyBriefItems((prev) => prev.filter((it) => it.id !== item.id));
@@ -1011,9 +1082,9 @@ export default function LibraryPage() {
           </form>
         </section>
 
-        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
-        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
-        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
+        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
+        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
+        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
         <Row
           title="Shared by friends"
           items={shareInboxItems}
@@ -1032,7 +1103,7 @@ export default function LibraryPage() {
           onSend={sessionToken ? sendToFriend : undefined}
           onDelete={deleteDailyBriefItem}
         />
-        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} />
+        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
       </main>
 
       {saveDraft ? (
