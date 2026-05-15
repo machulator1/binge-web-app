@@ -32,7 +32,14 @@ declare global {
   }
 }
 
-type SavedModality = "article" | "video" | "podcast";
+type SavedModality = "article" | "video" | "podcast" | "music";
+
+const SAVED_MODALITY_LABEL: Record<SavedModality, string> = {
+  article: "Article",
+  video: "Video",
+  podcast: "Podcast",
+  music: "Music",
+};
 
 type SavedQueueItem = {
   id: string;
@@ -914,11 +921,7 @@ export default function Home() {
 
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
                     <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
-                      {saveDraft.modality === "video"
-                        ? "Video"
-                        : saveDraft.modality === "podcast"
-                          ? "Podcast"
-                          : "Article"}
+                      {SAVED_MODALITY_LABEL[saveDraft.modality]}
                     </span>
                     <span className="text-foreground/35">•</span>
                     <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">

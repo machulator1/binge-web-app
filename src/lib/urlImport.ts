@@ -1,4 +1,4 @@
-export type SavedModality = "article" | "video" | "podcast";
+export type SavedModality = "article" | "video" | "podcast" | "music";
 
 export function looksLikeUrl(value: string) {
   const v = value.trim();
@@ -39,10 +39,15 @@ export function modalityFromUrl(url: URL): SavedModality {
 
   if (
     host.includes("spotify.com") ||
+    host.includes("music.apple.com") ||
+    host.includes("music.amazon.") ||
+    host.includes("amazon.com/music") ||
+    host.includes("tidal.com") ||
+    host.includes("bandcamp.com") ||
     host.includes("podcasts.apple.com") ||
     host.includes("soundcloud.com")
   ) {
-    return "podcast";
+    return host.includes("podcasts.apple.com") ? "podcast" : "music";
   }
 
   if (path.endsWith(".pdf")) return "article";
@@ -52,6 +57,7 @@ export function modalityFromUrl(url: URL): SavedModality {
 export function mockDuration(modality: SavedModality) {
   if (modality === "video") return 8 + Math.floor(Math.random() * 22);
   if (modality === "podcast") return 12 + Math.floor(Math.random() * 35);
+  if (modality === "music") return 3 + Math.floor(Math.random() * 8);
   return 6 + Math.floor(Math.random() * 14);
 }
 

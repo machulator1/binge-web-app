@@ -24,7 +24,7 @@ type ShareRow = {
 
 const SAVED_ITEMS_STORAGE_KEY = "binge_saved_items_v1";
 
-type SavedModality = "article" | "video" | "podcast";
+type SavedModality = "article" | "video" | "podcast" | "music";
 
 type SavedQueueItem = {
   id: string;

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { use, useMemo } from "react";
 
-type Modality = "article" | "video" | "podcast";
+type Modality = "article" | "video" | "podcast" | "music";
 
 type QueueItem = {
   id: string;
@@ -36,12 +36,14 @@ const MODALITY_LABEL: Record<Modality, string> = {
   article: "Article",
   video: "Video",
   podcast: "Podcast",
+  music: "Music",
 };
 
 const MODALITY_PILL: Record<Modality, string> = {
   article: "bg-blue-50 text-blue-700 ring-blue-200",
   video: "bg-purple-50 text-purple-700 ring-purple-200",
   podcast: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  music: "bg-amber-50 text-amber-700 ring-amber-200",
 };
 
 function extractMinutes(q: string) {
@@ -53,6 +55,7 @@ function extractMinutes(q: string) {
 
 function inferModality(q: string): Modality | null {
   const s = q.toLowerCase();
+  if (/(music|song|songs|album|playlist|spotify|soundcloud|artist)/.test(s)) return "music";
   if (/(podcast|listen|listening|audio)/.test(s)) return "podcast";
   if (/(video|watch|watching|youtube)/.test(s)) return "video";
   if (/(article|read|reading)/.test(s)) return "article";
@@ -136,7 +139,14 @@ function cacheForContentPage(item: QueueItem) {
 }
 
 function thumbFallback(item: QueueItem) {
-  const accent = item.modality === "video" ? "#8b5cf6" : item.modality === "podcast" ? "#10b981" : "#3b82f6";
+  const accent =
+    item.modality === "video"
+      ? "#8b5cf6"
+      : item.modality === "podcast"
+        ? "#10b981"
+        : item.modality === "music"
+          ? "#f59e0b"
+          : "#3b82f6";
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
       <defs>

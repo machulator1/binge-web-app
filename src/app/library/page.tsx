@@ -11,7 +11,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { looksLikeUrl } from "@/lib/urlImport";
 import { useSaveToBingeFlow } from "@/lib/useSaveToBingeFlow";
 
-type Modality = "article" | "video" | "podcast";
+type Modality = "article" | "video" | "podcast" | "music";
 type ItemStatus = "saved" | "in_progress" | "consumed";
 
 type QueueItem = {
@@ -67,12 +67,14 @@ const MODALITY_LABEL: Record<Modality, string> = {
   article: "Article",
   video: "Video",
   podcast: "Podcast",
+  music: "Music",
 };
 
 const MODALITY_PILL: Record<Modality, string> = {
   article: "bg-blue-50 text-blue-700 ring-blue-200",
   video: "bg-purple-50 text-purple-700 ring-purple-200",
   podcast: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  music: "bg-amber-50 text-amber-700 ring-amber-200",
 };
 
 type SendPayload = {
@@ -127,7 +129,13 @@ function isPlaceholderDescription(raw?: string) {
 
 function thumbDataUri(modality: Modality) {
   const accent =
-    modality === "video" ? "#8b5cf6" : modality === "podcast" ? "#10b981" : "#3b82f6";
+    modality === "video"
+      ? "#8b5cf6"
+      : modality === "podcast"
+        ? "#10b981"
+        : modality === "music"
+          ? "#f59e0b"
+          : "#3b82f6";
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="480" height="270" viewBox="0 0 480 270">
@@ -149,7 +157,7 @@ function thumbDataUri(modality: Modality) {
 
 function domainThumbDataUri({ hostname, modality }: { hostname: string; modality: Modality }) {
   const safeHost = hostname.replace(/^www\./i, "");
-  const label = modality === "video" ? "Video" : modality === "podcast" ? "Podcast" : "Article";
+  const label = MODALITY_LABEL[modality];
   const seed = Array.from(safeHost).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const hue = seed % 360;
   const hue2 = (hue + 36) % 360;
@@ -277,6 +285,7 @@ function Row({
                           <option value="article">Article</option>
                           <option value="video">Video</option>
                           <option value="podcast">Podcast</option>
+                          <option value="music">Music</option>
                           {customCategories?.map((category) => (
                             <option key={category} value={`custom:${category}`}>
                               {category}
@@ -898,6 +907,7 @@ export default function LibraryPage() {
 
   const videos = useMemo(() => items.filter((it) => it.modality === "video"), [items]);
   const podcasts = useMemo(() => items.filter((it) => it.modality === "podcast"), [items]);
+  const music = useMemo(() => items.filter((it) => it.modality === "music"), [items]);
   const articles = useMemo(() => items.filter((it) => it.modality === "article"), [items]);
   const savedByMe = useMemo(() => items.filter((it) => it.savedBy === "Me"), [items]);
   const customRows = useMemo(
@@ -1195,6 +1205,7 @@ export default function LibraryPage() {
 
         <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
         <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
+        <Row title="Music" items={music} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
         <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
         <Row
           title="Shared by friends"
@@ -1269,11 +1280,7 @@ export default function LibraryPage() {
 
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
                     <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
-                      {saveDraft.modality === "video"
-                        ? "Video"
-                        : saveDraft.modality === "podcast"
-                          ? "Podcast"
-                          : "Article"}
+                      {MODALITY_LABEL[saveDraft.modality]}
                     </span>
                     <span className="text-foreground/35">•</span>
                     <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Modality = "article" | "video" | "podcast";
+type Modality = "article" | "video" | "podcast" | "music";
 
 type ResolvedLink = {
   url: string;
@@ -110,10 +110,15 @@ function guessModalityFromUrl(url: URL): Modality {
 
   if (
     host.includes("spotify.com") ||
+    host.includes("music.apple.com") ||
+    host.includes("music.amazon.") ||
+    host.includes("amazon.com/music") ||
+    host.includes("tidal.com") ||
+    host.includes("bandcamp.com") ||
     host.includes("podcasts.apple.com") ||
     host.includes("soundcloud.com")
   ) {
-    return "podcast";
+    return host.includes("podcasts.apple.com") ? "podcast" : "music";
   }
 
   if (path.endsWith(".pdf")) return "article";
@@ -401,7 +406,8 @@ function extractJsonLdImages(html: string) {
 
 function domainThumbSvg({ hostname, modality }: { hostname: string; modality: Modality }) {
   const safeHost = hostname.replace(/^www\./i, "");
-  const label = modality === "video" ? "Video" : modality === "podcast" ? "Podcast" : "Article";
+  const label =
+    modality === "video" ? "Video" : modality === "podcast" ? "Podcast" : modality === "music" ? "Music" : "Article";
   const seed = Array.from(safeHost).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const hue = seed % 360;
   const hue2 = (hue + 36) % 360;

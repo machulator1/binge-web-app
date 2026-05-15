@@ -7,7 +7,14 @@ import { ShareSheet, type ShareSheetData } from "@/components/ShareSheet";
 import { tryNativeShare } from "@/lib/nativeShare";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
-type Modality = "article" | "video" | "podcast";
+type Modality = "article" | "video" | "podcast" | "music";
+
+const MODALITY_LABEL: Record<Modality, string> = {
+  article: "Article",
+  video: "Video",
+  podcast: "Podcast",
+  music: "Music",
+};
 
 type SavedQueueItem = {
   id: string;
@@ -222,7 +229,7 @@ export default function ContentPage({ params }: { params: { id: string } }) {
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
               <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
-                {item.modality === "video" ? "Video" : item.modality === "podcast" ? "Podcast" : "Article"}
+                {MODALITY_LABEL[item.modality]}
               </span>
               <span className="inline-flex h-5 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2">
                 {item.durationMinutes} min

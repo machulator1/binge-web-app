@@ -13,7 +13,7 @@ type SavedItemRow = {
   user_id: string;
   url: string;
   title: string | null;
-  modality: "article" | "video" | "podcast";
+  modality: "article" | "video" | "podcast" | "music";
   thumbnail_url: string | null;
   duration_minutes: number | null;
   source: string | null;
@@ -27,7 +27,7 @@ type SavedItemRow = {
 type Body = {
   url?: string;
   title?: string;
-  modality?: "article" | "video" | "podcast";
+  modality?: "article" | "video" | "podcast" | "music";
   thumbnailUrl?: string;
   durationMinutes?: number;
   source?: string;
