@@ -37,9 +37,31 @@ type Body = {
   dateSaved?: string;
   description?: string;
   notes?: string;
+  customCategory?: string;
 };
 
+const CUSTOM_CATEGORY_PREFIX = "[[binge_custom_category:";
+const CUSTOM_CATEGORY_SUFFIX = "]]";
+
+function splitNotesMetadata(raw?: string | null) {
+  const notes = raw ?? "";
+  if (!notes.startsWith(CUSTOM_CATEGORY_PREFIX)) return { notes: raw ?? undefined, customCategory: undefined };
+  const end = notes.indexOf(CUSTOM_CATEGORY_SUFFIX);
+  if (end === -1) return { notes: raw ?? undefined, customCategory: undefined };
+  const customCategory = notes.slice(CUSTOM_CATEGORY_PREFIX.length, end).trim() || undefined;
+  const cleanNotes = notes.slice(end + CUSTOM_CATEGORY_SUFFIX.length).replace(/^\n+/, "");
+  return { notes: cleanNotes || undefined, customCategory };
+}
+
+function mergeNotesMetadata(notes?: string | null, customCategory?: string) {
+  const clean = splitNotesMetadata(notes).notes ?? "";
+  const category = (customCategory ?? "").trim();
+  if (!category) return clean || null;
+  return `${CUSTOM_CATEGORY_PREFIX}${category}${CUSTOM_CATEGORY_SUFFIX}${clean ? `\n${clean}` : ""}`;
+}
+
 function rowToItem(row: SavedItemRow) {
+  const noteData = splitNotesMetadata(row.notes);
   return {
     id: row.id,
     title: row.title ?? row.url,
@@ -53,7 +75,8 @@ function rowToItem(row: SavedItemRow) {
     savedAt: row.created_at ?? (row.date_saved ? `${row.date_saved}T00:00:00.000Z` : undefined),
     thumbnailUrl: row.thumbnail_url ?? undefined,
     description: row.description ?? undefined,
-    notes: row.notes ?? undefined,
+    notes: noteData.notes,
+    customCategory: noteData.customCategory,
     storage: "server" as const,
   };
 }
@@ -141,7 +164,7 @@ export async function POST(req: Request) {
       status: body.status ?? "saved",
       date_saved: body.dateSaved ?? (body.savedAt ? body.savedAt.slice(0, 10) : null),
       description: body.description ?? null,
-      notes: body.notes ?? null,
+      notes: mergeNotesMetadata(body.notes, body.customCategory),
     };
 
     const { data, error } = await supabase

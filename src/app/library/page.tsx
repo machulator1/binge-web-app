@@ -30,6 +30,7 @@ type QueueItem = {
   description?: string;
   shareMessage?: string;
   notes?: string;
+  customCategory?: string;
   storage?: "local" | "server";
 };
 
@@ -59,6 +60,7 @@ type BriefStory = {
 };
 
 const SAVED_ITEMS_STORAGE_KEY = "binge_saved_items_v1";
+const CUSTOM_CATEGORIES_STORAGE_KEY = "binge_custom_categories_v1";
 const DAILY_BRIEF_DISMISSED_STORAGE_KEY = "binge_daily_brief_dismissed_v1";
 
 const MODALITY_LABEL: Record<Modality, string> = {
@@ -83,6 +85,10 @@ type SendPayload = {
 
 function withSavedAt(item: QueueItem): QueueItem {
   return { ...item, savedAt: item.savedAt ?? savedAtFromDateSaved(item.dateSaved) };
+}
+
+function customCategoriesStorageKey(userId: string | null) {
+  return userId ? `${CUSTOM_CATEGORIES_STORAGE_KEY}:${userId}` : `${CUSTOM_CATEGORIES_STORAGE_KEY}:local`;
 }
 
 type ResolvedLink = {
@@ -209,7 +215,8 @@ function Row({
   onShare,
   onSend,
   onDelete,
-  onChangeModality,
+  onChangeCategory,
+  customCategories,
 }: {
   title: string;
   items: QueueItem[];
@@ -218,7 +225,8 @@ function Row({
   onShare: (item: QueueItem) => void;
   onSend?: (item: QueueItem) => void;
   onDelete?: (item: QueueItem) => void;
-  onChangeModality?: (item: QueueItem, modality: Modality) => void;
+  onChangeCategory?: (item: QueueItem, category: string) => void;
+  customCategories?: string[];
 }) {
   if (items.length === 0) return null;
 
@@ -258,17 +266,22 @@ function Row({
 
                 <div className="mt-4 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {onChangeModality ? (
+                    {onChangeCategory ? (
                       <label className="relative inline-flex h-6 items-center">
                         <span className="sr-only">Change category</span>
                         <select
-                          value={item.modality}
-                          onChange={(e) => onChangeModality(item, e.target.value as Modality)}
+                          value={item.customCategory ? `custom:${item.customCategory}` : item.modality}
+                          onChange={(e) => onChangeCategory(item, e.target.value)}
                           className={`h-6 appearance-none rounded-full border-0 px-2 pr-6 text-[11px] font-semibold outline-none ring-1 ring-inset ${MODALITY_PILL[item.modality]}`}
                         >
                           <option value="article">Article</option>
                           <option value="video">Video</option>
                           <option value="podcast">Podcast</option>
+                          {customCategories?.map((category) => (
+                            <option key={category} value={`custom:${category}`}>
+                              {category}
+                            </option>
+                          ))}
                         </select>
                         <svg
                           aria-hidden="true"
@@ -500,12 +513,15 @@ const INITIAL_ITEMS: QueueItem[] = [
 
 export default function LibraryPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [newCarouselName, setNewCarouselName] = useState("");
   const [shareSheet, setShareSheet] = useState<ShareSheetData | null>(null);
   const [sendSheet, setSendSheet] = useState<SendPayload | null>(null);
   const [shareInboxItems, setShareInboxItems] = useState<QueueItem[]>([]);
   const [dailyBriefItems, setDailyBriefItems] = useState<QueueItem[]>([]);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [importUrl, setImportUrl] = useState("");
 
   const {
@@ -529,17 +545,28 @@ export default function LibraryPage() {
       } catch {
         // Ignore
       }
+
+      try {
+        const raw = window.localStorage.getItem(customCategoriesStorageKey(currentUserId));
+        const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+        const stored = Array.isArray(parsed)
+          ? parsed.filter((it): it is string => typeof it === "string" && Boolean(it.trim()))
+          : [];
+        setCustomCategories(Array.from(new Set(stored.map((it) => it.trim()))));
+      } catch {
+        // Ignore
+      }
     }
 
     load();
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key === SAVED_ITEMS_STORAGE_KEY) load();
+      if (e.key === SAVED_ITEMS_STORAGE_KEY || e.key === customCategoriesStorageKey(currentUserId)) load();
     };
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -561,6 +588,18 @@ export default function LibraryPage() {
         const next = loaded.map((it) => withSavedAt({ ...it, storage: "server" as const }));
         if (cancelled) return;
         setItems(next);
+        setCustomCategories((prev) => {
+          const assigned = next
+            .map((it) => it.customCategory)
+            .filter((it): it is string => typeof it === "string" && Boolean(it.trim()));
+          const merged = Array.from(new Set([...prev, ...assigned.map((it) => it.trim())]));
+          try {
+            window.localStorage.setItem(customCategoriesStorageKey(currentUserId), JSON.stringify(merged));
+          } catch {
+            // Ignore
+          }
+          return merged;
+        });
 
         try {
           const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY);
@@ -590,6 +629,7 @@ export default function LibraryPage() {
                   dateSaved: it.dateSaved,
                   description: it.description,
                   notes: it.notes,
+                  customCategory: it.customCategory,
                 }),
               }),
             ),
@@ -620,11 +660,12 @@ export default function LibraryPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionToken]);
+  }, [sessionToken, currentUserId]);
 
   useEffect(() => {
     if (!supabase) {
       setSessionToken(null);
+      setCurrentUserId(null);
       return;
     }
 
@@ -636,9 +677,11 @@ export default function LibraryPage() {
         const { data } = await sb.auth.getSession();
         if (!mounted) return;
         setSessionToken(data.session?.access_token ?? null);
+        setCurrentUserId(data.session?.user.id ?? null);
       } catch {
         if (!mounted) return;
         setSessionToken(null);
+        setCurrentUserId(null);
       }
     }
 
@@ -646,6 +689,7 @@ export default function LibraryPage() {
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       setSessionToken(session?.access_token ?? null);
+      setCurrentUserId(session?.user.id ?? null);
     });
 
     return () => {
@@ -720,6 +764,7 @@ export default function LibraryPage() {
                 dateSaved: patched.dateSaved,
                 description: patched.description,
                 notes: patched.notes,
+                customCategory: patched.customCategory,
               }),
             });
           }
@@ -855,6 +900,14 @@ export default function LibraryPage() {
   const podcasts = useMemo(() => items.filter((it) => it.modality === "podcast"), [items]);
   const articles = useMemo(() => items.filter((it) => it.modality === "article"), [items]);
   const savedByMe = useMemo(() => items.filter((it) => it.savedBy === "Me"), [items]);
+  const customRows = useMemo(
+    () =>
+      customCategories.map((category) => ({
+        category,
+        items: items.filter((it) => it.customCategory === category),
+      })),
+    [customCategories, items],
+  );
 
   function openInApp(item: QueueItem) {
     if (!item.url) return;
@@ -899,6 +952,25 @@ export default function LibraryPage() {
     e.preventDefault();
     setImportUrl("");
     openFromUrl(pasted);
+  }
+
+  function createCustomCarousel(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newCarouselName.trim();
+    if (!name) return;
+    const exists = customCategories.some((category) => category.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      setNewCarouselName("");
+      return;
+    }
+    const next = [...customCategories, name];
+    setCustomCategories(next);
+    setNewCarouselName("");
+    try {
+      window.localStorage.setItem(customCategoriesStorageKey(currentUserId), JSON.stringify(next));
+    } catch {
+      // Ignore
+    }
   }
 
   async function saveToLibraryAndRefresh() {
@@ -977,10 +1049,12 @@ export default function LibraryPage() {
     }
   }
 
-  function changeItemModality(item: QueueItem, modality: Modality) {
-    if (item.modality === modality) return;
+  function changeItemCategory(item: QueueItem, category: string) {
+    const customCategory = category.startsWith("custom:") ? category.slice("custom:".length) : "";
+    const modality = customCategory ? item.modality : (category as Modality);
+    if (item.modality === modality && (item.customCategory ?? "") === customCategory) return;
 
-    const nextItem: QueueItem = { ...item, modality };
+    const nextItem: QueueItem = { ...item, modality, customCategory: customCategory || undefined };
     setItems((prev) => prev.map((it) => (it.id === item.id ? nextItem : it)));
 
     if (sessionToken && item.storage === "server" && item.url) {
@@ -1003,6 +1077,7 @@ export default function LibraryPage() {
           dateSaved: item.dateSaved,
           description: item.description,
           notes: item.notes,
+          customCategory,
         }),
       });
       return;
@@ -1082,9 +1157,45 @@ export default function LibraryPage() {
           </form>
         </section>
 
-        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
-        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
-        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
+        <section className="px-5 pt-4">
+          <form onSubmit={createCustomCarousel} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+            <div className="text-sm font-semibold text-foreground">Create carousel</div>
+            <div className="mt-1 text-xs font-medium text-foreground/45">Make your own row, then assign saved items to it.</div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={newCarouselName}
+                onChange={(e) => setNewCarouselName(e.target.value)}
+                placeholder="e.g. Recipes, Work, Travel"
+                className="h-10 min-w-0 flex-1 rounded-2xl border border-white/12 bg-black/10 px-3 text-sm font-semibold text-foreground/85 outline-none placeholder:text-foreground/35 focus:border-white/18"
+              />
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-blue-500/90 px-4 text-xs font-semibold text-white ring-1 ring-blue-300/30 active:bg-blue-500"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {customRows.map(({ category, items: rowItems }) => (
+          <Row
+            key={category}
+            title={category}
+            items={rowItems}
+            size="default"
+            onOpen={openInApp}
+            onShare={shareItem}
+            onSend={sessionToken ? sendToFriend : undefined}
+            onDelete={deleteItem}
+            onChangeCategory={changeItemCategory}
+            customCategories={customCategories}
+          />
+        ))}
+
+        <Row title="Videos" items={videos} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
+        <Row title="Podcasts" items={podcasts} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
+        <Row title="Articles" items={articles} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
         <Row
           title="Shared by friends"
           items={shareInboxItems}
@@ -1103,7 +1214,7 @@ export default function LibraryPage() {
           onSend={sessionToken ? sendToFriend : undefined}
           onDelete={deleteDailyBriefItem}
         />
-        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeModality={changeItemModality} />
+        <Row title="Saved by me" items={savedByMe} size="default" onOpen={openInApp} onShare={shareItem} onSend={sessionToken ? sendToFriend : undefined} onDelete={deleteItem} onChangeCategory={changeItemCategory} customCategories={customCategories} />
       </main>
 
       {saveDraft ? (
